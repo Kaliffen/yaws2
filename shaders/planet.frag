@@ -286,8 +286,8 @@ void main() {
     float waterRadius = planetRadius + seaLevel;
 
     float t0, t1;
-    bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, t0, t1);
-    if (t0 < 0.0) t0 = 0.0;
+    bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, t0, t1) && t1 > 0.0;
+    if (hitWaterSphere && t0 < 0.0) t0 = 0.0;
 
     float tTerrain = hit ? t : 1e9;
     vec3 terrainColor = vec3(0.0);

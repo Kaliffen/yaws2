@@ -173,14 +173,28 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     return color * ndl + color * 0.05;
 }
 
-vec3 computeAtmosphere(vec3 ro, vec3 rd) {
-    float sum = 0.0;
-    for (int i = 0; i < 40; i++) {
-        float k = float(i) / 40.0;
-        vec3 p = ro + rd * (k * 20.0);
-        sum += atmosphereDensity(p) * 0.03;
+vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
+    vec3 surfaceDir;
+
+    if (hit) {
+        surfaceDir = normalize(hitPos);
+    } else {
+        float tClosest = max(-dot(ro, rd), 0.0);
+        vec3 closest = ro + rd * tClosest;
+        surfaceDir = normalize(closest);
     }
-    return vec3(0.4, 0.6, 1.0) * sum;
+
+    float horizonDot = clamp(dot(rd, surfaceDir), -1.0, 1.0);
+    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 5.0);
+
+    float viewHeight = max(length(ro) - 1.0, 0.0);
+    float altitudeFalloff = exp(-viewHeight * 1.8);
+
+    float sunWrap = clamp(dot(surfaceDir, sunDir) * 0.5 + 0.5, 0.0, 1.0);
+    float scatter = horizonFactor * (0.2 + 0.8 * sunWrap) * altitudeFalloff;
+
+    vec3 atmosphereColor = vec3(0.25, 0.45, 0.9);
+    return atmosphereColor * scatter;
 }
 
 // =========================================
@@ -200,8 +214,6 @@ void main() {
 
     vec3 col = vec3(0.0);
 
-    vec3 atm = computeAtmosphere(ro, rd);
-
     if (hit) {
         vec3 surf = shadeSurface(pos, rd);
 
@@ -210,6 +222,8 @@ void main() {
     } else {
         col = vec3(0.05, 0.07, 0.1);
     }
+
+    vec3 atm = computeAtmosphere(ro, rd, hit, pos);
 
     col += atm;
 

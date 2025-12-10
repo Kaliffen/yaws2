@@ -92,8 +92,9 @@ float terrainHeight(vec3 p) {
     float base = fbm(warpedP);
     float detail = fbm(warpedP * 2.5) * 0.35;
 
-    float normalized = base * 0.65 + detail * 0.35;
-    return normalized * heightScale;
+    float normalized = base * 0.62 + detail * 0.38;
+    // Bias terrain downward so part of it sits below sea level and forms oceans.
+    return (normalized - 0.42) * heightScale;
 }
 
 float planetSDF(vec3 p) {
@@ -160,10 +161,10 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
 
     float h = terrainHeight(p);
 
-    vec3 ocean = vec3(0.03, 0.12, 0.28);
-    vec3 coast = vec3(0.85, 0.76, 0.6);
-    vec3 land = vec3(0.1, 0.38, 0.15);
-    vec3 mountain = vec3(0.5, 0.5, 0.52);
+    vec3 ocean = vec3(0.026, 0.16, 0.32);
+    vec3 coast = vec3(0.82, 0.75, 0.6);
+    vec3 land = vec3(0.16, 0.4, 0.18);
+    vec3 mountain = vec3(0.55, 0.56, 0.6);
     vec3 snow = vec3(0.92, 0.95, 0.98);
 
     float seaLevelHeight = seaLevel;  // water height (planetRadius + seaLevel)
@@ -226,7 +227,8 @@ vec3 shadeWater(vec3 p, vec3 rd, float depth, vec3 floorColor) {
     float absorption = exp(-waterAbsorption * depth * 0.35);
     float scatter = mix(0.1, 0.35, waterScattering);
 
-    vec3 transmitted = mix(floorColor, waterColor, 0.6) * absorption;
+    float depthDarken = clamp(depth * 0.08, 0.0, 1.0);
+    vec3 transmitted = mix(floorColor * 0.9, waterColor * 1.3, depthDarken) * absorption;
     vec3 reflected = waterColor * (0.4 + 0.6 * ndl);
 
     vec3 color = mix(transmitted, reflected, fresnel);
@@ -251,21 +253,24 @@ vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
     }
 
     float horizonDot = clamp(dot(rd, surfaceDir), -1.0, 1.0);
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 5.0);
+    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 5.5);
 
     float viewHeight = max(length(ro) - planetRadius, 0.0);
     float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
-    float altitudeFalloff = exp(-viewHeight / (atmThickness * 0.8));
-    float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.5);
+    float altitudeNorm = clamp(viewHeight / atmThickness, 0.0, 1.0);
+    float altitudeFalloff = mix(1.0, 0.2, altitudeNorm * altitudeNorm);
+    float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.6);
 
     float sunFacing = dot(surfaceDir, sunDir);
-    float sunWrap = clamp(sunFacing * 0.5 + 0.5, 0.0, 1.0);
-    float sunVisibility = smoothstep(-0.25, 0.15, sunFacing);
+    float sunWrap = clamp(sunFacing * 0.55 + 0.45, 0.0, 1.0);
+    float sunVisibility = smoothstep(-0.2, 0.15, sunFacing);
+    float mieForward = pow(clamp(0.5 + 0.5 * dot(rd, sunDir), 0.0, 1.0), 4.0);
 
-    float scatter = horizonFactor * (0.15 + 0.85 * sunWrap * sunVisibility)
+    float scatter = horizonFactor * (0.18 + 0.82 * sunWrap * sunVisibility)
                   * altitudeFalloff * (0.35 + 0.65 * densityAlongView);
+    scatter += mieForward * 0.08 * sunVisibility;
 
-    vec3 atmosphereColor = vec3(0.25, 0.45, 0.9);
+    vec3 atmosphereColor = vec3(0.3, 0.56, 0.96);
     return atmosphereColor * scatter;
 }
 

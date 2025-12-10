@@ -61,7 +61,19 @@ float fbm(vec3 p) {
 // =========================================
 
 float terrainHeight(vec3 p) {
-    return fbm(p * 3.0) * 0.2;
+    float warpFreq = 1.3;
+    float warpAmp = 0.1;
+    vec3 warp = vec3(
+        fbm(p * warpFreq + vec3(11.7)),
+        fbm(p * warpFreq + vec3(3.9, 17.2, 5.1)),
+        fbm(p * warpFreq - vec3(7.5))
+    );
+    vec3 warpedP = p * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
+
+    float base = fbm(warpedP);
+    float detail = fbm(warpedP * 2.5) * 0.35;
+
+    return (base * 0.65 + detail * 0.35) * 0.18;
 }
 
 float planetSDF(vec3 p) {

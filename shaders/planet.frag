@@ -113,6 +113,15 @@ float atmosphereDensity(vec3 p) {
     return normalized * normalized;
 }
 
+vec3 simpleAerialPerspective(vec3 ro, vec3 rd, float travel, vec3 baseColor) {
+    float viewHeight = max(length(ro) - planetRadius, 0.0);
+    float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
+    float density = exp(-viewHeight / (atmThickness * 0.7));
+    float transmittance = exp(-travel * density * 0.012);
+    vec3 sky = vec3(0.35, 0.55, 0.95) * density;
+    return mix(sky, baseColor, transmittance);
+}
+
 
 // =============================================================
 // Ray Helpers
@@ -138,6 +147,31 @@ bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     return false;
 }
 
+float softShadow(vec3 ro, vec3 rd, float maxT) {
+    float res = 1.0;
+    float t = 0.02;
+    float k = 10.0;
+    for (int i = 0; i < 64 && t < maxT; i++) {
+        vec3 p = ro + rd * t;
+        float h = planetSDF(p);
+        res = min(res, k * h / t);
+        t += clamp(h, 0.05, 0.5);
+    }
+    return clamp(res, 0.0, 1.0);
+}
+
+float ambientOcclusion(vec3 p, vec3 n) {
+    float occlusion = 0.0;
+    float stepSize = max(heightScale * 0.025, planetRadius * 0.0005);
+    for (int i = 1; i <= 5; i++) {
+        float t = stepSize * float(i);
+        float sample = planetSDF(p + n * t);
+        occlusion += clamp(sample / t, 0.0, 1.0);
+    }
+    occlusion = occlusion / 5.0;
+    return clamp(occlusion, 0.0, 1.0);
+}
+
 
 // =============================================================
 // Surface Shading (unchanged)
@@ -151,12 +185,14 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     float dz = planetSDF(p + vec3(0,0,eps)) - d0;
 
     vec3 n = normalize(vec3(dx, dy, dz));
-    float ndl = dot(n, sunDir);
+    float ndl = clamp(dot(n, sunDir), 0.0, 1.0);
 
-    float diffuse = max(ndl, 0.0);
-    float horizonBlend = smoothstep(0.0, 0.22, diffuse);
-    float ambient = 0.06;
-    float lighting = clamp(ambient + diffuse * horizonBlend, 0.0, 1.0);
+    float shadow = softShadow(p + n * eps * 2.0, sunDir, 6.0);
+    float horizonBlend = smoothstep(0.0, 0.3, ndl);
+    float ao = ambientOcclusion(p, n);
+    float diffuse = ndl * horizonBlend * shadow;
+    float ambient = mix(0.08, 0.2, ao);
+    float lighting = clamp(ambient + diffuse, 0.0, 1.0);
 
     float h = terrainHeight(p);
 
@@ -218,16 +254,17 @@ vec3 shadeWater(vec3 p, vec3 rd, float depth, vec3 floorColor) {
     vec3 n = normalize(p);
 
     float ndl = max(dot(n, sunDir), 0.0);
-    float diffuse = mix(0.2, 1.0, ndl);
+    float shadow = softShadow(p + n * 0.02, sunDir, 8.0);
+    float diffuse = mix(0.2, 1.0, ndl) * shadow;
 
     float fresnel = 0.04 + pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 5.0);
-    float spec = pow(max(dot(reflect(-sunDir, n), -rd), 0.0), 24.0) * 0.4;
+    float spec = pow(max(dot(reflect(-sunDir, n), -rd), 0.0), 64.0) * 0.6 * shadow;
 
     float absorption = exp(-waterAbsorption * depth * 0.35);
     float scatter = mix(0.1, 0.35, waterScattering);
 
     vec3 transmitted = mix(floorColor, waterColor, 0.6) * absorption;
-    vec3 reflected = waterColor * (0.4 + 0.6 * ndl);
+    vec3 reflected = waterColor * (0.35 + 0.65 * ndl);
 
     vec3 color = mix(transmitted, reflected, fresnel);
     color += spec * (0.2 + scatter);
@@ -267,6 +304,15 @@ vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
 
     vec3 atmosphereColor = vec3(0.25, 0.45, 0.9);
     return atmosphereColor * scatter;
+}
+
+vec3 toneMapACES(vec3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
 
@@ -309,7 +355,12 @@ void main() {
     }
 
     vec3 atm = computeAtmosphere(ro, rd, hit, pos);
+    float travel = hit ? tTerrain : maxRayDistance;
+    col = simpleAerialPerspective(ro, rd, travel, col);
     col += atm;
+
+    col = toneMapACES(col);
+    col = pow(col, vec3(1.0 / 2.2));
 
     FragColor = vec4(col, 1.0);
 }

@@ -181,14 +181,13 @@ void main() {
         waterFlag = 0.0;
     }
 
-    bool waterCoversTerrain = hitWaterSphere && (t0 < tTerrain);
+    bool waterCoversTerrain = hitWaterSphere && (t0 < tTerrain) && heightValue <= seaLevel;
     if (waterCoversTerrain) {
         vec3 waterSurfacePos = ro + rd * t0;
         pos = waterSurfacePos;
         normal = normalize(waterSurfacePos);
         baseColor = mix(baseColor, waterColor, 0.6);
         waterFlag = 1.0;
-        heightValue = max(heightValue, seaLevel);
     } else if (!hit) {
         pos = ro + rd * maxRayDistance;
     }

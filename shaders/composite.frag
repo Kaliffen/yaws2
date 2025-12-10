@@ -134,11 +134,13 @@ void main() {
     float shadow = hit ? computeShadow(pos, normal) : 0.0;
 
     // Water depth approximation relative to sea level
-    float waterDepth = max((planetRadius + seaLevel) - length(pos), 0.0);
+    float waterDepth = (waterFlag > 0.5) ? max(seaLevel - heightValue, 0.0) : 0.0;
     vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth);
 
     vec3 color = albedo * lighting;
-    color = mix(color, waterShaded, step(0.5, waterFlag + 1.0));
+    if (waterFlag > 0.5) {
+        color = waterShaded;
+    }
     color *= shadow;
 
     // Atmosphere layer

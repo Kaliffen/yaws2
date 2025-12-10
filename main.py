@@ -7,9 +7,16 @@ from gl_utils.shader import compile_shader
 from gl_utils.program import create_program
 from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera
-from rendering.constants import PLANET_RADIUS
+from rendering.constants import HEIGHT_SCALE, PLANET_RADIUS
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer
+
+
+def compute_adaptive_speed(position, base_speed):
+    distance = np.linalg.norm(position)
+    distance_ratio = distance / PLANET_RADIUS
+    adaptive_factor = np.clip(0.15 + distance_ratio * 0.85, 0.15, 4.0)
+    return base_speed * adaptive_factor
 
 
 def main():
@@ -45,8 +52,10 @@ def main():
         yaw=-90.0,
         pitch=0.0
     )
-    base_speed = PLANET_RADIUS * 0.6
+    base_speed = PLANET_RADIUS * 0.35
     camera.speed = base_speed
+    surface_radius = PLANET_RADIUS + HEIGHT_SCALE
+    camera.min_radius = surface_radius + HEIGHT_SCALE * 0.25
 
     renderer = PlanetRenderer(program)
     timer = DeltaTimer()
@@ -75,8 +84,9 @@ def main():
         camera.process_mouse(xoff, yoff)
 
         # Keyboard
-        speed_multiplier = 2.2 if glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS else 1.0
-        camera.speed = base_speed * speed_multiplier
+        shift_pressed = glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
+        speed_multiplier = 10.0 if shift_pressed else 1.0
+        camera.speed = compute_adaptive_speed(camera.position, base_speed) * speed_multiplier
 
         if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
             camera.process_movement("FORWARD", dt)

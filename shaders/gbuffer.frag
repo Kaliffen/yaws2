@@ -191,7 +191,16 @@ void main() {
         pos = ro + rd * maxRayDistance;
     }
 
-    float cloudDensity = clamp(fbm(normalize(rd) * 2.5 + vec3(0.3, 0.1, -0.4)) * 0.6, 0.0, 1.0);
+    float cloudDensity = 0.0;
+
+    // Only accumulate cloud noise when the view ray actually passes through the
+    // atmosphere (or hits the surface). Otherwise distant space renders pick up
+    // stray gray cloud patterns.
+    float tAtm0, tAtm1;
+    bool throughAtmosphere = hit || (intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
+    if (throughAtmosphere) {
+        cloudDensity = clamp(fbm(normalize(rd) * 2.5 + vec3(0.3, 0.1, -0.4)) * 0.6, 0.0, 1.0);
+    }
 
     gPositionHeight = vec4(pos, heightValue);
     gNormalFlags = vec4(normal, waterFlag);

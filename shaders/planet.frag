@@ -168,7 +168,12 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
 
     vec3 n = normalize(vec3(dx, dy, dz));
 
-    float ndl = max(0.0, dot(n, sunDir));
+    float ndl = dot(n, sunDir);
+
+    float diffuse = max(ndl, 0.0);
+    float horizonBlend = smoothstep(0.0, 0.22, diffuse);
+    float ambient = 0.06;
+    float lighting = clamp(ambient + diffuse * horizonBlend, 0.0, 1.0);
 
     float h = terrainHeight(p);
 
@@ -189,7 +194,7 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     color = mix(color, mountain, mountainBlend);
     color = mix(color, snow, snowBlend);
 
-    return color * ndl + color * 0.05;
+    return color * lighting;
 }
 
 vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
@@ -211,8 +216,10 @@ vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
     float altitudeFalloff = exp(-viewHeight / (atmThickness * 0.8));
     float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.5);
 
-    float sunWrap = clamp(dot(surfaceDir, sunDir) * 0.5 + 0.5, 0.0, 1.0);
-    float scatter = horizonFactor * (0.2 + 0.8 * sunWrap) * altitudeFalloff * (0.4 + 0.6 * densityAlongView);
+    float sunFacing = dot(surfaceDir, sunDir);
+    float sunWrap = clamp(sunFacing * 0.5 + 0.5, 0.0, 1.0);
+    float sunVisibility = smoothstep(-0.25, 0.15, sunFacing);
+    float scatter = horizonFactor * (0.15 + 0.85 * sunWrap * sunVisibility) * altitudeFalloff * (0.35 + 0.65 * densityAlongView);
 
     vec3 atmosphereColor = vec3(0.25, 0.45, 0.9);
     return atmosphereColor * scatter;

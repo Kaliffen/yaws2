@@ -39,12 +39,15 @@ def main():
 
     with open("shaders/planet.vert") as f:
         vert_src = f.read()
-    with open("shaders/planet.frag") as f:
-        frag_src = f.read()
+    with open("shaders/gbuffer.frag") as f:
+        gbuffer_src = f.read()
+    with open("shaders/composite.frag") as f:
+        composite_src = f.read()
 
-    program = create_program(vert_src, frag_src)
+    gbuffer_program = create_program(vert_src, gbuffer_src)
+    composite_program = create_program(vert_src, composite_src)
 
-    glUseProgram(program)
+    glUseProgram(gbuffer_program)
 
     camera = FPSCamera(
         position=np.array([0.0, 0.0, PLANET_RADIUS * 1.6], dtype=np.float32),
@@ -58,8 +61,11 @@ def main():
     surface_radius = PLANET_RADIUS + HEIGHT_SCALE
     camera.min_radius = surface_radius + HEIGHT_SCALE * 0.25
 
-    renderer = PlanetRenderer(program)
+    renderer = PlanetRenderer(gbuffer_program, composite_program)
     timer = DeltaTimer()
+
+    layer_visibility = [False] * 9
+    pressed_state = [False] * 9
 
     last_mouse_x, last_mouse_y = width / 2, height / 2
     first_mouse = True
@@ -98,20 +104,35 @@ def main():
         if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
             camera.process_movement("RIGHT", dt)
 
+        for idx, key in enumerate([
+            glfw.KEY_1,
+            glfw.KEY_2,
+            glfw.KEY_3,
+            glfw.KEY_4,
+            glfw.KEY_5,
+            glfw.KEY_6,
+            glfw.KEY_7,
+            glfw.KEY_8,
+            glfw.KEY_9,
+        ]):
+            is_pressed = glfw.get_key(window, key) == glfw.PRESS
+            if is_pressed and not pressed_state[idx]:
+                layer_visibility[idx] = not layer_visibility[idx]
+            pressed_state[idx] = is_pressed
+
         glViewport(0, 0, width, height)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        glBindVertexArray(quad_vao)
         renderer.render(
             camera.position,
             camera.front,
             camera.right,
             camera.up,
             width,
-            height
+            height,
+            layer_visibility
         )
-
-        glBindVertexArray(quad_vao)
-        glDrawArrays(GL_TRIANGLES, 0, 6)
 
         glfw.swap_buffers(window)
         glfw.poll_events()

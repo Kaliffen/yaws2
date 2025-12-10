@@ -10,8 +10,6 @@ uniform vec3 camUp;
 uniform vec3 sunDir;
 
 uniform float aspect;
-uniform float time;
-uniform float dt;
 
 uniform float planetRadius;
 uniform float atmosphereRadius;
@@ -102,155 +100,6 @@ float atmosphereDensity(vec3 p) {
     float thickness = max(atmosphereRadius - planetRadius, 0.001);
     float normalized = clamp(1.0 - altitude / thickness, 0.0, 1.0);
     return normalized * normalized;
-}
-
-// =========================================
-// Clouds as volumetric density
-// =========================================
-
-float worley(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    float d = 1.0;
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            for (int z = -1; z <= 1; z++) {
-                vec3 cell = i + vec3(x, y, z);
-                vec3 rand = vec3(
-                    hash(cell + vec3(0.17, 4.1, 1.3)),
-                    hash(cell + vec3(2.7, 0.3, 5.1)),
-                    hash(cell + vec3(6.2, 1.1, 3.4))
-                );
-                vec3 diff = vec3(x, y, z) + rand - f;
-                d = min(d, length(diff));
-            }
-        }
-    }
-    return clamp(1.0 - d, 0.0, 1.0);
-}
-
-float cloudShape(vec3 p) {
-    float fbmBase = fbm(p * 0.7);
-    float fbmDetail = fbm(p * 1.9);
-    float cell = worley(p * 0.55);
-    float shape = mix(fbmBase, 1.0 - cell, 0.5) + fbmDetail * 0.35;
-    return clamp(shape, 0.0, 1.0);
-}
-
-float cloudPattern(vec3 p) {
-    vec3 cloudP = (p / planetRadius) * 3.2 + vec3(time * 0.01, time * 0.008, -time * 0.006);
-    float base = cloudShape(cloudP);
-    float detail = fbm(cloudP * 3.5);
-    return base * 0.75 + detail * 0.25 - 0.25;
-}
-
-float cloudDensity(vec3 p) {
-    float r = length(p);
-    float lower = planetRadius * 1.02;
-    float upper = planetRadius * 1.06;
-    if (r < lower || r > upper)
-        return 0.0;
-
-    float edgeThickness = planetRadius * 0.005;
-    float lowerBlend = smoothstep(lower, lower + edgeThickness, r);
-    float upperBlend = 1.0 - smoothstep(upper - edgeThickness, upper, r);
-    float band = lowerBlend * upperBlend;
-
-    float density = smoothstep(0.18, 0.6, cloudPattern(p)) * band;
-    return density;
-}
-
-vec3 cloudNormal(vec3 p) {
-    float eps = planetRadius * 0.002;
-    vec3 grad = vec3(
-        cloudPattern(p + vec3(eps, 0.0, 0.0)) - cloudPattern(p - vec3(eps, 0.0, 0.0)),
-        cloudPattern(p + vec3(0.0, eps, 0.0)) - cloudPattern(p - vec3(0.0, eps, 0.0)),
-        cloudPattern(p + vec3(0.0, 0.0, eps)) - cloudPattern(p - vec3(0.0, 0.0, eps))
-    );
-
-    if (length(grad) < 1e-4) {
-        return normalize(p);
-    }
-    return normalize(grad);
-}
-
-bool intersectSphere(vec3 ro, vec3 rd, float radius, out float t0, out float t1) {
-    float b = dot(ro, rd);
-    float c = dot(ro, ro) - radius * radius;
-    float h = b * b - c;
-    if (h < 0.0) return false;
-    h = sqrt(h);
-    t0 = -b - h;
-    t1 = -b + h;
-    return true;
-}
-
-bool intersectShell(vec3 ro, vec3 rd, float rMin, float rMax, out float tEnter, out float tExit) {
-    float t0, t1;
-    if (!intersectSphere(ro, rd, rMax, t0, t1)) return false;
-
-    float ti0, ti1;
-    bool hitInner = intersectSphere(ro, rd, rMin, ti0, ti1);
-
-    tEnter = t0;
-    tExit = t1;
-
-    if (hitInner) {
-        // When starting inside the shell, enter is after exiting inner sphere.
-        tEnter = max(tEnter, ti1);
-    }
-
-    return tExit > tEnter;
-}
-
-vec4 integrateClouds(vec3 ro, vec3 rd, float tMax, out float shadow) {
-    float rMin = planetRadius * 1.02;
-    float rMax = planetRadius * 1.06;
-    float tEnter, tExit;
-    if (!intersectShell(ro, rd, rMin, rMax, tEnter, tExit)) {
-        shadow = 0.0;
-        return vec4(0.0);
-    }
-
-    tEnter = max(tEnter, 0.0);
-    tExit = min(tExit, tMax);
-    if (tExit <= tEnter) {
-        shadow = 0.0;
-        return vec4(0.0);
-    }
-
-    int steps = 32;
-    float dt = (tExit - tEnter) / float(steps);
-    float transmittance = 1.0;
-    vec3 accumColor = vec3(0.0);
-    shadow = 0.0;
-    float densityIntegral = 0.0;
-
-    for (int i = 0; i < steps; i++) {
-        float t = tEnter + (float(i) + 0.5) * dt;
-        vec3 p = ro + rd * t;
-        float d = cloudDensity(p);
-        if (d <= 0.0005) continue;
-
-        vec3 n = cloudNormal(p);
-        float ndl = max(dot(n, sunDir), 0.0);
-        float ambient = 0.12;
-        float lighting = ambient + (1.0 - ambient) * ndl;
-
-        float extinction = d * 3.5;
-        float stepAlpha = 1.0 - exp(-extinction * dt);
-        vec3 stepColor = vec3(1.0) * lighting;
-
-        accumColor += transmittance * stepColor * stepAlpha;
-        transmittance *= (1.0 - stepAlpha);
-        densityIntegral += d * dt;
-
-        if (transmittance < 0.02) break;
-    }
-
-    shadow = clamp(densityIntegral * 1.4, 0.0, 1.0);
-    float alphaTotal = clamp(1.0 - transmittance, 0.0, 0.78);
-    return vec4(accumColor, alphaTotal);
 }
 
 // =========================================
@@ -376,16 +225,11 @@ void main() {
     float t;
 
     bool hit = marchPlanet(ro, rd, pos, t);
-    float shadow = 0.0;
-    vec4 cloud = integrateClouds(ro, rd, hit ? t : maxRayDistance, shadow);
 
     vec3 col = vec3(0.05, 0.07, 0.1);
 
     if (hit) {
-        vec3 surf = shadeSurface(pos, rd);
-        col = mix(surf, cloud.rgb, cloud.a);
-    } else {
-        col = mix(col, cloud.rgb, cloud.a);
+        col = shadeSurface(pos, rd);
     }
 
     vec3 atm = computeAtmosphere(ro, rd, hit, pos);

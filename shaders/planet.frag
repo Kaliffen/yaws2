@@ -194,7 +194,22 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     color = mix(color, mountain, mountainBlend);
     color = mix(color, snow, snowBlend);
 
-    return color * lighting;
+    vec3 litColor = color * lighting;
+
+    float surfaceRadius = length(p);
+    float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
+    float remainingAtmosphere = clamp(atmosphereRadius - surfaceRadius, 0.0, atmThickness);
+    float altitudeFactor = pow(smoothstep(0.0, 1.0, remainingAtmosphere / atmThickness), 1.2);
+
+    float viewFacing = clamp(dot(n, -rd), 0.0, 1.0);
+    float horizonFactor = pow(1.0 - viewFacing, 1.15);
+    float viewFactor = mix(0.2, 1.0, horizonFactor) * horizonFactor;
+
+    float litSide = smoothstep(0.0, 0.3, ndl);
+    vec3 atmosphereTint = vec3(0.08, 0.16, 0.32);
+    vec3 tint = atmosphereTint * altitudeFactor * viewFactor * litSide * 0.65;
+
+    return litColor + tint;
 }
 
 vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {

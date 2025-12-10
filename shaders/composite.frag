@@ -73,7 +73,8 @@ vec3 shadeWater(vec3 pos, vec3 normal, vec3 albedo, float depth) {
     float ndl = max(dot(normal, sunDir), 0.0);
     float fresnel = 0.04 + pow(1.0 - clamp(dot(normal, normalize(pos - camPos)), 0.0, 1.0), 5.0);
     vec3 reflected = albedo * (0.4 + 0.6 * ndl);
-    vec3 transmitted = albedo * exp(-depth * 0.15);
+    float depthDarken = clamp(depth * 0.06, 0.0, 1.0);
+    vec3 transmitted = mix(albedo * 1.35, albedo, depthDarken) * exp(-depth * 0.12);
     vec3 color = mix(transmitted, reflected, fresnel);
     color += pow(max(dot(reflect(-sunDir, normal), normalize(pos - camPos)), 0.0), 48.0) * 0.25;
     return color;
@@ -82,21 +83,24 @@ vec3 shadeWater(vec3 pos, vec3 normal, vec3 albedo, float depth) {
 vec3 computeAtmosphere(vec3 viewDir, vec3 pos, bool hit) {
     vec3 surfaceDir = hit ? normalize(pos) : normalize(viewDir);
     float horizonDot = clamp(dot(viewDir, surfaceDir), -1.0, 1.0);
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
+    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 5.5);
 
     float viewHeight = max(length(camPos) - planetRadius, 0.0);
     float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
-    float altitudeFalloff = exp(-viewHeight / (atmThickness * 0.8));
-    float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.5);
+    float altitudeNorm = clamp(viewHeight / atmThickness, 0.0, 1.0);
+    float altitudeFalloff = mix(1.0, 0.2, altitudeNorm * altitudeNorm);
+    float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.6);
 
     float sunFacing = dot(surfaceDir, sunDir);
-    float sunWrap = clamp(sunFacing * 0.5 + 0.5, 0.0, 1.0);
-    float sunVisibility = smoothstep(-0.25, 0.1, sunFacing);
+    float sunWrap = clamp(sunFacing * 0.55 + 0.45, 0.0, 1.0);
+    float sunVisibility = smoothstep(-0.2, 0.15, sunFacing);
+    float mieForward = pow(clamp(0.5 + 0.5 * dot(viewDir, sunDir), 0.0, 1.0), 4.0);
 
-    float scatter = horizonFactor * (0.25 + 0.75 * sunWrap * sunVisibility)
+    float scatter = horizonFactor * (0.22 + 0.78 * sunWrap * sunVisibility)
                   * altitudeFalloff * (0.35 + 0.65 * densityAlongView);
+    scatter += mieForward * 0.08 * sunVisibility;
 
-    vec3 atmosphereColor = vec3(0.2, 0.42, 0.96);
+    vec3 atmosphereColor = vec3(0.3, 0.56, 0.96);
     return atmosphereColor * scatter;
 }
 

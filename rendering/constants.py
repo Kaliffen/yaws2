@@ -16,9 +16,11 @@ HEIGHT_SCALE = 8.2
 
 # Water parameters
 SEA_LEVEL = 0.0  # height above the planet radius where water begins
-WATER_COLOR = np.array([0.016, 0.11, 0.26], dtype=np.float32)
-WATER_ABSORPTION = 0.18
-WATER_SCATTERING = 0.08
+# Slightly brighter water with a touch more scattering makes oceans stand out
+# against land.
+WATER_COLOR = np.array([0.02, 0.16, 0.34], dtype=np.float32)
+WATER_ABSORPTION = 0.24
+WATER_SCATTERING = 0.12
 
 # Raymarch distances scale with the planet to ensure intersections are found
 # reliably without overshooting.

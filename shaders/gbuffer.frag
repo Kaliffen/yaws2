@@ -80,8 +80,10 @@ float terrainHeight(vec3 p) {
     float base = fbm(warpedP);
     float detail = fbm(warpedP * 2.5) * 0.35;
 
-    float normalized = base * 0.65 + detail * 0.35;
-    return normalized * heightScale;
+    float normalized = base * 0.62 + detail * 0.38;
+    // Bias the terrain downward so a portion of the surface sits below sea level,
+    // revealing oceans instead of an all-land sphere.
+    return (normalized - 0.42) * heightScale;
 }
 
 float planetSDF(vec3 p) {
@@ -131,10 +133,10 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
 }
 
 vec3 landColor(float h) {
-    vec3 ocean = vec3(0.02, 0.12, 0.24);
-    vec3 coast = vec3(0.78, 0.7, 0.55);
-    vec3 land = vec3(0.12, 0.42, 0.18);
-    vec3 mountain = vec3(0.58, 0.58, 0.6);
+    vec3 ocean = vec3(0.026, 0.16, 0.32);
+    vec3 coast = vec3(0.82, 0.75, 0.6);
+    vec3 land = vec3(0.16, 0.4, 0.18);
+    vec3 mountain = vec3(0.55, 0.56, 0.6);
     vec3 snow = vec3(0.92, 0.95, 0.98);
 
     float seaLevelHeight = seaLevel;

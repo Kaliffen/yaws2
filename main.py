@@ -7,6 +7,7 @@ from gl_utils.shader import compile_shader
 from gl_utils.program import create_program
 from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera
+from rendering.constants import PLANET_RADIUS
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer
 
@@ -40,10 +41,12 @@ def main():
     glUseProgram(program)
 
     camera = FPSCamera(
-        position=np.array([0.0, 0.0, 6.0], dtype=np.float32),
+        position=np.array([0.0, 0.0, PLANET_RADIUS * 1.6], dtype=np.float32),
         yaw=-90.0,
         pitch=0.0
     )
+    base_speed = PLANET_RADIUS * 0.6
+    camera.speed = base_speed
 
     renderer = PlanetRenderer(program)
     timer = DeltaTimer()
@@ -72,6 +75,9 @@ def main():
         camera.process_mouse(xoff, yoff)
 
         # Keyboard
+        speed_multiplier = 2.2 if glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS else 1.0
+        camera.speed = base_speed * speed_multiplier
+
         if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
             camera.process_movement("FORWARD", dt)
         if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
@@ -80,8 +86,6 @@ def main():
             camera.process_movement("LEFT", dt)
         if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
             camera.process_movement("RIGHT", dt)
-        if glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
-            camera.process_movement("FAST", dt)
 
         glViewport(0, 0, width, height)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)

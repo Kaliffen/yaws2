@@ -7,6 +7,11 @@ def set_vec3(program, name, v):
     glUniform3f(loc, float(v[0]), float(v[1]), float(v[2]))
 
 
+def set_vec2(program, name, v):
+    loc = glGetUniformLocation(program, name)
+    glUniform2f(loc, float(v[0]), float(v[1]))
+
+
 def set_float(program, name, value):
     loc = glGetUniformLocation(program, name)
     glUniform1f(loc, float(value))

@@ -2,15 +2,17 @@
 
 SUN_DIRECTION = np.array([0.6, 0.4, 0.7], dtype=np.float32)
 
-# Base scale values for the planet and atmosphere
-# A significantly larger planet keeps curvature realistic from orbit while
-# keeping the atmosphere a thin shell.
-PLANET_RADIUS = 120.0
-ATMOSPHERE_RADIUS = PLANET_RADIUS * 1.03
+# Base scale values for the planet and atmosphere (kilometers)
+# Use a realistic Earth-sized radius so the horizon and curvature feel correct
+# when flying close to the surface.
+PLANET_RADIUS = 6371.0
 
-# Terrain displacement remains small relative to the radius to avoid
-# exaggerated features when scaling up the planet size.
-HEIGHT_SCALE = PLANET_RADIUS * 0.017
+# Keep a thin atmospheric shell around the surface (~120 km thick).
+ATMOSPHERE_RADIUS = PLANET_RADIUS + 120.0
+
+# Keep terrain displacement realistic relative to the planet scale to avoid
+# exaggerated features.
+HEIGHT_SCALE = 9.5
 
 # Raymarch distances scale with the planet to ensure intersections are found
 # reliably without overshooting.

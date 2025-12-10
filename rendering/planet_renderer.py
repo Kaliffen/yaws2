@@ -5,7 +5,11 @@ from rendering.constants import (
     HEIGHT_SCALE,
     MAX_RAY_DISTANCE,
     PLANET_RADIUS,
+    SEA_LEVEL,
     SUN_DIRECTION,
+    WATER_ABSORPTION,
+    WATER_COLOR,
+    WATER_SCATTERING,
 )
 from rendering.uniforms import set_float, set_vec2, set_vec3
 
@@ -27,6 +31,10 @@ class PlanetRenderer:
         set_float(self.program, "atmosphereRadius", ATMOSPHERE_RADIUS)
         set_float(self.program, "heightScale", HEIGHT_SCALE)
         set_float(self.program, "maxRayDistance", MAX_RAY_DISTANCE)
+        set_float(self.program, "seaLevel", SEA_LEVEL)
+        set_vec3(self.program, "waterColor", WATER_COLOR)
+        set_float(self.program, "waterAbsorption", WATER_ABSORPTION)
+        set_float(self.program, "waterScattering", WATER_SCATTERING)
         set_vec2(self.program, "resolution", (width, height))
 
         set_float(self.program, "aspect", float(width) / float(height))

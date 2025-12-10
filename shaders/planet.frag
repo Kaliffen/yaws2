@@ -152,7 +152,9 @@ float cloudDensity(vec3 p) {
         return 0.0;
 
     float edgeThickness = planetRadius * 0.005;
-    float band = smoothstep(lower, lower + edgeThickness, r) * smoothstep(upper, upper - edgeThickness, r);
+    float lowerBlend = smoothstep(lower, lower + edgeThickness, r);
+    float upperBlend = 1.0 - smoothstep(upper - edgeThickness, upper, r);
+    float band = lowerBlend * upperBlend;
 
     float density = smoothstep(0.18, 0.6, cloudPattern(p)) * band;
     return density;
@@ -248,8 +250,7 @@ vec4 integrateClouds(vec3 ro, vec3 rd, float tMax, out float shadow) {
 
     shadow = clamp(densityIntegral * 1.4, 0.0, 1.0);
     float alphaTotal = clamp(1.0 - transmittance, 0.0, 0.78);
-    vec3 normalizedColor = alphaTotal > 1e-4 ? accumColor / max(alphaTotal, 1e-4) : vec3(1.0);
-    return vec4(normalizedColor, alphaTotal);
+    return vec4(accumColor, alphaTotal);
 }
 
 // =========================================
@@ -265,7 +266,7 @@ vec3 rayDirection(vec2 uv) {
 bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     t = 0.0;
     float maxDist = maxRayDistance;
-    float eps = max(planetRadius * 0.0005, 0.01);
+    float eps = max(heightScale * 0.02, planetRadius * 0.0001);
     for (int i = 0; i < 320; i++) {
         vec3 p = ro + rd * t;
         float d = planetSDF(p);
@@ -382,8 +383,6 @@ void main() {
 
     if (hit) {
         vec3 surf = shadeSurface(pos, rd);
-        float shadowFactor = mix(1.0, 0.65, shadow * 0.8);
-        surf *= shadowFactor;
         col = mix(surf, cloud.rgb, cloud.a);
     } else {
         col = mix(col, cloud.rgb, cloud.a);

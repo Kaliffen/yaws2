@@ -212,26 +212,28 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
 
 
 // =============================================================
-// Water: Volumetric Ray March
+// Water: Simple Shading
 // =============================================================
-vec3 marchWater(vec3 ro, vec3 rd, float tStart, float tEnd) {
-    int steps = 40;
-    float dt = (tEnd - tStart) / float(steps);
+vec3 shadeWater(vec3 p, vec3 rd, float depth, vec3 floorColor) {
+    vec3 n = normalize(p);
 
-    vec3 col = vec3(0.0);
+    float ndl = max(dot(n, sunDir), 0.0);
+    float diffuse = mix(0.2, 1.0, ndl);
 
-    for (int i = 0; i < steps; i++) {
-        float t = tStart + dt * float(i);
-        float depth = (tEnd - t);
+    float fresnel = 0.04 + pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 5.0);
+    float spec = pow(max(dot(reflect(-sunDir, n), -rd), 0.0), 24.0) * 0.4;
 
-        float absorb = exp(-waterAbsorption * depth);
+    float absorption = exp(-waterAbsorption * depth * 0.35);
+    float scatter = mix(0.1, 0.35, waterScattering);
 
-        float phase = pow(max(dot(rd, sunDir), 0.0), 6.0) * waterScattering;
+    vec3 transmitted = mix(floorColor, waterColor, 0.6) * absorption;
+    vec3 reflected = waterColor * (0.4 + 0.6 * ndl);
 
-        col += waterColor * absorb + phase * 0.02;
-    }
+    vec3 color = mix(transmitted, reflected, fresnel);
+    color += spec * (0.2 + scatter);
+    color *= diffuse;
 
-    return col / float(steps);
+    return color;
 }
 
 
@@ -285,32 +287,25 @@ void main() {
 
     float t0, t1;
     bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, t0, t1);
-
     if (t0 < 0.0) t0 = 0.0;
 
     float tTerrain = hit ? t : 1e9;
-
-    vec3 waterCol = vec3(0.0);
-    bool inWater = false;
-
-    if (hitWaterSphere) {
-        float tEntry = t0;
-        float tExit  = min(t1, tTerrain);
-
-        if (tExit > tEntry) {
-            inWater = true;
-            waterCol = marchWater(ro, rd, tEntry, tExit);
-        }
+    vec3 terrainColor = vec3(0.0);
+    if (hit) {
+        terrainColor = shadeSurface(pos, rd);
     }
+
+    bool waterCoversTerrain = hitWaterSphere && (t0 < tTerrain);
 
     vec3 col = vec3(0.05, 0.07, 0.1);
 
-    if (hit) {
-        col = shadeSurface(pos, rd);
-    }
-
-    if (inWater) {
-        col = mix(col, waterCol, 0.85);
+    if (waterCoversTerrain) {
+        float depth = max(min(t1, tTerrain) - t0, 0.0);
+        vec3 waterSurfacePos = ro + rd * t0;
+        vec3 floorColor = hit ? terrainColor : waterColor;
+        col = shadeWater(waterSurfacePos, rd, depth, floorColor);
+    } else if (hit) {
+        col = terrainColor;
     }
 
     vec3 atm = computeAtmosphere(ro, rd, hit, pos);

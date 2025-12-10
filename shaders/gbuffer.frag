@@ -156,7 +156,7 @@ void main() {
     vec3 ro = camPos;
     vec3 rd = rayDirection(uv);
 
-    vec3 pos;
+    vec3 pos = vec3(0.0);
     float t;
     bool hit = marchPlanet(ro, rd, pos, t);
 
@@ -182,6 +182,7 @@ void main() {
     bool waterCoversTerrain = hitWaterSphere && (t0 < tTerrain);
     if (waterCoversTerrain) {
         vec3 waterSurfacePos = ro + rd * t0;
+        pos = waterSurfacePos;
         normal = normalize(waterSurfacePos);
         baseColor = mix(baseColor, waterColor, 0.6);
         waterFlag = 1.0;

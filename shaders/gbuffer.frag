@@ -170,7 +170,7 @@ void main() {
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
     float waterFlag = -1.0;
-    vec3 normal = vec3(0.0, 1.0, 0.0);
+    vec3 normal = normalize(rd);
 
     if (hit) {
         float d0 = planetSDF(pos);
@@ -187,6 +187,8 @@ void main() {
         baseColor = mix(baseColor, waterColor, 0.6);
         waterFlag = 1.0;
         heightValue = max(heightValue, seaLevel);
+    } else if (!hit) {
+        pos = ro + rd * maxRayDistance;
     }
 
     float cloudDensity = clamp(fbm(normalize(rd) * 2.5 + vec3(0.3, 0.1, -0.4)) * 0.6, 0.0, 1.0);

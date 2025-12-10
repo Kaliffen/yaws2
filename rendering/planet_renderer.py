@@ -21,6 +21,9 @@ class PlanetRenderer:
         self.composite_program = composite_program
         self.gbuffer = None
         self.cam_pos = None
+        self.cam_forward = None
+        self.cam_right = None
+        self.cam_up = None
 
     def _ensure_gbuffer(self, width, height):
         if self.gbuffer and self.gbuffer["width"] == width and self.gbuffer["height"] == height:
@@ -30,6 +33,9 @@ class PlanetRenderer:
 
     def _bind_common_uniforms(self, program, width, height):
         set_vec3(program, "camPos", self.cam_pos)
+        set_vec3(program, "camForward", self.cam_forward)
+        set_vec3(program, "camRight", self.cam_right)
+        set_vec3(program, "camUp", self.cam_up)
         set_vec3(program, "sunDir", SUN_DIRECTION)
         set_float(program, "planetRadius", PLANET_RADIUS)
         set_float(program, "atmosphereRadius", ATMOSPHERE_RADIUS)
@@ -37,9 +43,13 @@ class PlanetRenderer:
         set_float(program, "maxRayDistance", MAX_RAY_DISTANCE)
         set_float(program, "seaLevel", SEA_LEVEL)
         set_vec2(program, "resolution", (width, height))
+        set_float(program, "aspect", float(width) / float(height))
 
     def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, layer_visibility):
         self.cam_pos = cam_pos
+        self.cam_forward = cam_front
+        self.cam_right = cam_right
+        self.cam_up = cam_up
         self._ensure_gbuffer(width, height)
 
         # Pass 1: populate G-buffer

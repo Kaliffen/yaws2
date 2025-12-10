@@ -60,9 +60,13 @@ float fbm(vec3 p) {
 // Planet SDF with height map
 // =========================================
 
+float terrainHeight(vec3 p) {
+    return fbm(p * 3.0) * 0.2;
+}
+
 float planetSDF(vec3 p) {
     float r = length(p);
-    float h = fbm(p * 3.0) * 0.2;
+    float h = terrainHeight(p);
     return r - (1.0 + h);
 }
 
@@ -135,7 +139,26 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
 
     float ndl = max(0.0, dot(n, sunDir));
 
-    return vec3(0.2, 0.3, 0.1) * ndl + vec3(0.05);
+    float h = terrainHeight(p);
+
+    vec3 ocean = vec3(0.03, 0.12, 0.28);
+    vec3 coast = vec3(0.85, 0.76, 0.6);
+    vec3 land = vec3(0.1, 0.38, 0.15);
+    vec3 mountain = vec3(0.5, 0.5, 0.52);
+    vec3 snow = vec3(0.92, 0.95, 0.98);
+
+    float seaLevel = 0.08;
+    float coastBlend = smoothstep(seaLevel - 0.025, seaLevel + 0.01, h);
+    float landBlend = smoothstep(seaLevel + 0.005, seaLevel + 0.07, h);
+    float mountainBlend = smoothstep(seaLevel + 0.09, seaLevel + 0.14, h);
+    float snowBlend = smoothstep(seaLevel + 0.15, seaLevel + 0.19, h);
+
+    vec3 color = mix(ocean, coast, coastBlend);
+    color = mix(color, land, landBlend);
+    color = mix(color, mountain, mountainBlend);
+    color = mix(color, snow, snowBlend);
+
+    return color * ndl + color * 0.05;
 }
 
 vec3 computeAtmosphere(vec3 ro, vec3 rd) {

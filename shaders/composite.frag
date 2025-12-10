@@ -9,6 +9,9 @@ uniform sampler2D gNormalFlags;
 uniform sampler2D gMaterial;
 
 uniform vec3 camPos;
+uniform vec3 camForward;
+uniform vec3 camRight;
+uniform vec3 camUp;
 uniform vec3 sunDir;
 uniform float planetRadius;
 uniform float atmosphereRadius;
@@ -16,6 +19,7 @@ uniform float heightScale;
 uniform float seaLevel;
 uniform float maxRayDistance;
 uniform vec2 resolution;
+uniform float aspect;
 
 uniform bool showLayer[9];
 
@@ -44,6 +48,12 @@ vec4 decodeNormalFlags(vec2 uv) {
 
 vec4 decodeMaterial(vec2 uv) {
     return texture(gMaterial, uv);
+}
+
+vec3 rayDirection(vec2 uv) {
+    uv = uv * 2.0 - 1.0;
+    uv.x *= aspect;
+    return normalize(camForward + uv.x * camRight + uv.y * camUp);
 }
 
 float atmosphereDensity(vec3 p) {
@@ -128,7 +138,7 @@ void main() {
     color *= shadow;
 
     // Atmosphere layer
-    vec3 viewDir = normalize(pos - camPos);
+    vec3 viewDir = hit ? normalize(pos - camPos) : rayDirection(uv);
     vec3 atmosphere = computeAtmosphere(viewDir, pos, hit);
 
     // Cloud layer

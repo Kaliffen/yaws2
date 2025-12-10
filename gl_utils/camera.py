@@ -15,6 +15,7 @@ class FPSCamera:
         self.up = np.array([0, 1, 0], dtype=np.float32)
         self.speed = 5.0
         self.sensitivity = 0.1
+        self.min_radius = None
         self.update_vectors()
 
     def update_vectors(self):
@@ -53,3 +54,11 @@ class FPSCamera:
             self.position -= self.right * velocity
         if direction == "RIGHT":
             self.position += self.right * velocity
+
+        if self.min_radius is not None:
+            dist = np.linalg.norm(self.position)
+            if dist < self.min_radius:
+                if dist > 1e-6:
+                    self.position = normalize(self.position) * self.min_radius
+                else:
+                    self.position = np.array([0, 0, self.min_radius], dtype=np.float32)

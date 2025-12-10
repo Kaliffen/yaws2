@@ -1,7 +1,6 @@
 ﻿import glfw
 from OpenGL.GL import *
 import numpy as np
-import time
 
 from gl_utils.shader import compile_shader
 from gl_utils.program import create_program
@@ -106,9 +105,7 @@ def main():
             camera.right,
             camera.up,
             width,
-            height,
-            dt,
-            time.time()
+            height
         )
 
         glBindVertexArray(quad_vao)

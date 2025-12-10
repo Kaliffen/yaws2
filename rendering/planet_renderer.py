@@ -1,7 +1,13 @@
 ﻿from OpenGL.GL import *
 
-from rendering.constants import SUN_DIRECTION
-from rendering.uniforms import set_vec3, set_float
+from rendering.constants import (
+    ATMOSPHERE_RADIUS,
+    HEIGHT_SCALE,
+    MAX_RAY_DISTANCE,
+    PLANET_RADIUS,
+    SUN_DIRECTION,
+)
+from rendering.uniforms import set_float, set_vec2, set_vec3
 
 
 class PlanetRenderer:
@@ -16,6 +22,12 @@ class PlanetRenderer:
         set_vec3(self.program, "camRight", cam_right)
         set_vec3(self.program, "camUp", cam_up)
         set_vec3(self.program, "sunDir", SUN_DIRECTION)
+
+        set_float(self.program, "planetRadius", PLANET_RADIUS)
+        set_float(self.program, "atmosphereRadius", ATMOSPHERE_RADIUS)
+        set_float(self.program, "heightScale", HEIGHT_SCALE)
+        set_float(self.program, "maxRayDistance", MAX_RAY_DISTANCE)
+        set_vec2(self.program, "resolution", (width, height))
 
         set_float(self.program, "time", float(t))
         set_float(self.program, "dt", float(dt))

@@ -13,6 +13,12 @@ uniform float aspect;
 uniform float time;
 uniform float dt;
 
+uniform float planetRadius;
+uniform float atmosphereRadius;
+uniform float heightScale;
+uniform float maxRayDistance;
+uniform vec2 resolution;
+
 // =========================================
 // Helpers
 // =========================================
@@ -61,25 +67,30 @@ float fbm(vec3 p) {
 // =========================================
 
 float terrainHeight(vec3 p) {
+    // Sample terrain in normalized planet space so the patterns stay consistent
+    // as the planet radius scales up.
+    vec3 scaledP = p / planetRadius;
+
     float warpFreq = 1.3;
-    float warpAmp = 0.1;
+    float warpAmp = 0.08;
     vec3 warp = vec3(
-        fbm(p * warpFreq + vec3(11.7)),
-        fbm(p * warpFreq + vec3(3.9, 17.2, 5.1)),
-        fbm(p * warpFreq - vec3(7.5))
+        fbm(scaledP * warpFreq + vec3(11.7)),
+        fbm(scaledP * warpFreq + vec3(3.9, 17.2, 5.1)),
+        fbm(scaledP * warpFreq - vec3(7.5))
     );
-    vec3 warpedP = p * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
+    vec3 warpedP = scaledP * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
 
     float base = fbm(warpedP);
     float detail = fbm(warpedP * 2.5) * 0.35;
 
-    return (base * 0.65 + detail * 0.35) * 0.18;
+    float normalized = base * 0.65 + detail * 0.35;
+    return normalized * heightScale;
 }
 
 float planetSDF(vec3 p) {
     float r = length(p);
     float h = terrainHeight(p);
-    return r - (1.0 + h);
+    return r - (planetRadius + h);
 }
 
 // =========================================
@@ -87,8 +98,10 @@ float planetSDF(vec3 p) {
 // =========================================
 
 float atmosphereDensity(vec3 p) {
-    float h = length(p) - 1.0;
-    return clamp(1.0 - h / 0.1, 0.0, 1.0);
+    float altitude = length(p) - planetRadius;
+    float thickness = max(atmosphereRadius - planetRadius, 0.001);
+    float normalized = clamp(1.0 - altitude / thickness, 0.0, 1.0);
+    return normalized * normalized;
 }
 
 // =========================================
@@ -96,9 +109,13 @@ float atmosphereDensity(vec3 p) {
 // =========================================
 
 float cloudDensity(vec3 p) {
-    if (length(p) < 1.0 || length(p) > 1.1)
+    float r = length(p);
+    float lower = mix(planetRadius, atmosphereRadius, 0.32);
+    float upper = mix(planetRadius, atmosphereRadius, 0.65);
+    if (r < lower || r > upper)
         return 0.0;
-    return fbm(p * 4.0 + time * 0.05) * 0.5;
+    vec3 cloudP = (p / planetRadius) * 4.0 + time * 0.03;
+    return fbm(cloudP) * 0.5;
 }
 
 // =========================================
@@ -113,15 +130,16 @@ vec3 rayDirection(vec2 uv) {
 
 bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     t = 0.0;
-    float maxDist = 20.0;
-    for (int i = 0; i < 200; i++) {
+    float maxDist = maxRayDistance;
+    float eps = max(planetRadius * 0.0005, 0.01);
+    for (int i = 0; i < 320; i++) {
         vec3 p = ro + rd * t;
         float d = planetSDF(p);
-        if (d < 0.001) {
+        if (d < eps) {
             pos = p;
             return true;
         }
-        t += d * 0.7;
+        t += max(d * 0.7, eps * 0.5);
         if (t > maxDist) break;
     }
     return false;
@@ -130,8 +148,9 @@ bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
 float integrateClouds(vec3 ro, vec3 rd, float tMax) {
     float sum = 0.0;
     float t = 0.0;
-    for (int i = 0; i < 40; i++) {
-        float k = float(i) / 40.0;
+    int steps = 56;
+    for (int i = 0; i < steps; i++) {
+        float k = float(i) / float(steps);
         float ti = k * tMax;
         vec3 p = ro + rd * ti;
         sum += cloudDensity(p) * 0.05;
@@ -140,7 +159,7 @@ float integrateClouds(vec3 ro, vec3 rd, float tMax) {
 }
 
 vec3 shadeSurface(vec3 p, vec3 rd) {
-    float eps = 0.001;
+    float eps = max(planetRadius * 0.0005, heightScale * 0.03);
 
     float d0 = planetSDF(p);
     float dx = planetSDF(p + vec3(eps,0,0)) - d0;
@@ -159,11 +178,11 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     vec3 mountain = vec3(0.5, 0.5, 0.52);
     vec3 snow = vec3(0.92, 0.95, 0.98);
 
-    float seaLevel = 0.08;
-    float coastBlend = smoothstep(seaLevel - 0.025, seaLevel + 0.01, h);
-    float landBlend = smoothstep(seaLevel + 0.005, seaLevel + 0.07, h);
-    float mountainBlend = smoothstep(seaLevel + 0.09, seaLevel + 0.14, h);
-    float snowBlend = smoothstep(seaLevel + 0.15, seaLevel + 0.19, h);
+    float seaLevel = heightScale * 0.45;
+    float coastBlend = smoothstep(seaLevel - heightScale * 0.14, seaLevel + heightScale * 0.06, h);
+    float landBlend = smoothstep(seaLevel + heightScale * 0.03, seaLevel + heightScale * 0.4, h);
+    float mountainBlend = smoothstep(seaLevel + heightScale * 0.45, seaLevel + heightScale * 0.7, h);
+    float snowBlend = smoothstep(seaLevel + heightScale * 0.75, seaLevel + heightScale * 0.92, h);
 
     vec3 color = mix(ocean, coast, coastBlend);
     color = mix(color, land, landBlend);
@@ -187,11 +206,13 @@ vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
     float horizonDot = clamp(dot(rd, surfaceDir), -1.0, 1.0);
     float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 5.0);
 
-    float viewHeight = max(length(ro) - 1.0, 0.0);
-    float altitudeFalloff = exp(-viewHeight * 1.8);
+    float viewHeight = max(length(ro) - planetRadius, 0.0);
+    float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
+    float altitudeFalloff = exp(-viewHeight / (atmThickness * 0.8));
+    float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.5);
 
     float sunWrap = clamp(dot(surfaceDir, sunDir) * 0.5 + 0.5, 0.0, 1.0);
-    float scatter = horizonFactor * (0.2 + 0.8 * sunWrap) * altitudeFalloff;
+    float scatter = horizonFactor * (0.2 + 0.8 * sunWrap) * altitudeFalloff * (0.4 + 0.6 * densityAlongView);
 
     vec3 atmosphereColor = vec3(0.25, 0.45, 0.9);
     return atmosphereColor * scatter;
@@ -202,7 +223,7 @@ vec3 computeAtmosphere(vec3 ro, vec3 rd, bool hit, vec3 hitPos) {
 // =========================================
 
 void main() {
-    vec2 uv = (gl_FragCoord.xy / vec2(1280, 720)) * 2.0 - 1.0;
+    vec2 uv = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
 
     vec3 ro = camPos;
     vec3 rd = rayDirection(uv);

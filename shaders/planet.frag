@@ -137,21 +137,39 @@ float cloudShape(vec3 p) {
     return clamp(shape, 0.0, 1.0);
 }
 
-float cloudDensity(vec3 p) {
-    float r = length(p);
-    float lower = planetRadius * 1.02;
-    float upper = planetRadius * 1.07;
-    if (r < lower || r > upper)
-        return 0.0;
-
-    float band = smoothstep(lower, lower + planetRadius * 0.01, r) * smoothstep(upper, upper - planetRadius * 0.015, r);
-
+float cloudPattern(vec3 p) {
     vec3 cloudP = (p / planetRadius) * 3.2 + vec3(time * 0.01, time * 0.008, -time * 0.006);
     float base = cloudShape(cloudP);
     float detail = fbm(cloudP * 3.5);
-    float density = base * 0.75 + detail * 0.25 - 0.28;
-    density = smoothstep(0.0, 0.55, density) * band;
+    return base * 0.75 + detail * 0.25 - 0.25;
+}
+
+float cloudDensity(vec3 p) {
+    float r = length(p);
+    float lower = planetRadius * 1.02;
+    float upper = planetRadius * 1.06;
+    if (r < lower || r > upper)
+        return 0.0;
+
+    float edgeThickness = planetRadius * 0.005;
+    float band = smoothstep(lower, lower + edgeThickness, r) * smoothstep(upper, upper - edgeThickness, r);
+
+    float density = smoothstep(0.18, 0.6, cloudPattern(p)) * band;
     return density;
+}
+
+vec3 cloudNormal(vec3 p) {
+    float eps = planetRadius * 0.002;
+    vec3 grad = vec3(
+        cloudPattern(p + vec3(eps, 0.0, 0.0)) - cloudPattern(p - vec3(eps, 0.0, 0.0)),
+        cloudPattern(p + vec3(0.0, eps, 0.0)) - cloudPattern(p - vec3(0.0, eps, 0.0)),
+        cloudPattern(p + vec3(0.0, 0.0, eps)) - cloudPattern(p - vec3(0.0, 0.0, eps))
+    );
+
+    if (length(grad) < 1e-4) {
+        return normalize(p);
+    }
+    return normalize(grad);
 }
 
 bool intersectSphere(vec3 ro, vec3 rd, float radius, out float t0, out float t1) {
@@ -185,7 +203,7 @@ bool intersectShell(vec3 ro, vec3 rd, float rMin, float rMax, out float tEnter, 
 
 vec4 integrateClouds(vec3 ro, vec3 rd, float tMax, out float shadow) {
     float rMin = planetRadius * 1.02;
-    float rMax = planetRadius * 1.07;
+    float rMax = planetRadius * 1.06;
     float tEnter, tExit;
     if (!intersectShell(ro, rd, rMin, rMax, tEnter, tExit)) {
         shadow = 0.0;
@@ -199,34 +217,39 @@ vec4 integrateClouds(vec3 ro, vec3 rd, float tMax, out float shadow) {
         return vec4(0.0);
     }
 
-    int steps = 28;
+    int steps = 32;
     float dt = (tExit - tEnter) / float(steps);
     float transmittance = 1.0;
-    vec3 color = vec3(0.0);
+    vec3 accumColor = vec3(0.0);
     shadow = 0.0;
+    float densityIntegral = 0.0;
 
     for (int i = 0; i < steps; i++) {
         float t = tEnter + (float(i) + 0.5) * dt;
         vec3 p = ro + rd * t;
         float d = cloudDensity(p);
-        if (d <= 0.001) continue;
+        if (d <= 0.0005) continue;
 
-        float densityAhead = cloudDensity(p + sunDir * planetRadius * 0.01);
-        float lighting = 0.55 + 0.45 * clamp(1.0 - densityAhead * 1.6, 0.0, 1.0);
+        vec3 n = cloudNormal(p);
+        float ndl = max(dot(n, sunDir), 0.0);
+        float ambient = 0.12;
+        float lighting = ambient + (1.0 - ambient) * ndl;
 
-        float alpha = 1.0 - exp(-d * 6.5 * dt);
-        vec3 scatter = vec3(1.0) * lighting * alpha;
+        float extinction = d * 3.5;
+        float stepAlpha = 1.0 - exp(-extinction * dt);
+        vec3 stepColor = vec3(1.0) * lighting;
 
-        color += transmittance * scatter;
-        transmittance *= (1.0 - alpha * 0.85);
-        shadow += d * dt;
+        accumColor += transmittance * stepColor * stepAlpha;
+        transmittance *= (1.0 - stepAlpha);
+        densityIntegral += d * dt;
 
         if (transmittance < 0.02) break;
     }
 
-    shadow = clamp(shadow * 1.8, 0.0, 1.0);
-    float alphaTotal = clamp(1.0 - transmittance, 0.0, 1.0);
-    return vec4(color, alphaTotal);
+    shadow = clamp(densityIntegral * 1.4, 0.0, 1.0);
+    float alphaTotal = clamp(1.0 - transmittance, 0.0, 0.78);
+    vec3 normalizedColor = alphaTotal > 1e-4 ? accumColor / max(alphaTotal, 1e-4) : vec3(1.0);
+    return vec4(normalizedColor, alphaTotal);
 }
 
 // =========================================
@@ -361,9 +384,9 @@ void main() {
         vec3 surf = shadeSurface(pos, rd);
         float shadowFactor = mix(1.0, 0.65, shadow * 0.8);
         surf *= shadowFactor;
-        col = surf * (1.0 - cloud.a) + cloud.rgb;
+        col = mix(surf, cloud.rgb, cloud.a);
     } else {
-        col = col * (1.0 - cloud.a) + cloud.rgb;
+        col = mix(col, cloud.rgb, cloud.a);
     }
 
     vec3 atm = computeAtmosphere(ro, rd, hit, pos);

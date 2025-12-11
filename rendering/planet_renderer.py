@@ -3,6 +3,11 @@ from OpenGL.GL import *
 from gl_utils.buffers import create_gbuffer
 from rendering.constants import (
     ATMOSPHERE_RADIUS,
+    CLOUD_BASE_ALTITUDE,
+    CLOUD_COVERAGE,
+    CLOUD_DENSITY,
+    CLOUD_LAYER_THICKNESS,
+    CLOUD_LIGHT_COLOR,
     HEIGHT_SCALE,
     MAX_RAY_DISTANCE,
     PLANET_RADIUS,
@@ -42,6 +47,11 @@ class PlanetRenderer:
         set_float(program, "heightScale", HEIGHT_SCALE)
         set_float(program, "maxRayDistance", MAX_RAY_DISTANCE)
         set_float(program, "seaLevel", SEA_LEVEL)
+        set_float(program, "cloudBaseAltitude", CLOUD_BASE_ALTITUDE)
+        set_float(program, "cloudLayerThickness", CLOUD_LAYER_THICKNESS)
+        set_float(program, "cloudCoverage", CLOUD_COVERAGE)
+        set_float(program, "cloudDensity", CLOUD_DENSITY)
+        set_vec3(program, "cloudLightColor", CLOUD_LIGHT_COLOR)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))
 
@@ -69,6 +79,11 @@ class PlanetRenderer:
         set_float(self.gbuffer_program, "heightScale", HEIGHT_SCALE)
         set_float(self.gbuffer_program, "maxRayDistance", MAX_RAY_DISTANCE)
         set_float(self.gbuffer_program, "seaLevel", SEA_LEVEL)
+        set_float(self.gbuffer_program, "cloudBaseAltitude", CLOUD_BASE_ALTITUDE)
+        set_float(self.gbuffer_program, "cloudLayerThickness", CLOUD_LAYER_THICKNESS)
+        set_float(self.gbuffer_program, "cloudCoverage", CLOUD_COVERAGE)
+        set_float(self.gbuffer_program, "cloudDensity", CLOUD_DENSITY)
+        set_vec3(self.gbuffer_program, "cloudLightColor", CLOUD_LIGHT_COLOR)
         set_vec3(self.gbuffer_program, "waterColor", WATER_COLOR)
         set_float(self.gbuffer_program, "waterAbsorption", WATER_ABSORPTION)
         set_float(self.gbuffer_program, "waterScattering", WATER_SCATTERING)

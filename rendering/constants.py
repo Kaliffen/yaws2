@@ -29,3 +29,12 @@ WATER_SCATTERING = 0.14
 # reliably without overshooting. A longer distance avoids missing the planet
 # when pulling far back for full-globe views.
 MAX_RAY_DISTANCE = PLANET_RADIUS * 3.0
+
+# Cloud parameters keep volumetric sampling anchored to the planet instead of the
+# screen. A shallow layer near the surface produces convincing low-altitude
+# clouds without spilling deep into the atmosphere.
+CLOUD_BASE_ALTITUDE = 6.5
+CLOUD_LAYER_THICKNESS = 8.0
+CLOUD_COVERAGE = 0.62
+CLOUD_DENSITY = 0.85
+CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)

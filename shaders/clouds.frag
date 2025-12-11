@@ -121,7 +121,11 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
     float start = max(tOuter0, 0.0);
     if (hitsInner) {
-        start = max(start, tInner1);
+        // If we're outside the cloud shell, begin at the near-side entry into the
+        // inner sphere. If we're already inside the inner sphere (e.g., on the
+        // surface), skip ahead to the far-side exit so we don't march beneath the
+        // cloud base.
+        start = max(start, tInner0 > 0.0 ? tInner0 : tInner1);
     }
     float end = min(tOuter1, maxDistance);
     if (end <= start) {

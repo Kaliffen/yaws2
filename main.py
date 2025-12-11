@@ -45,9 +45,7 @@ class PlanetWidget(QOpenGLWidget):
         self.setMouseTracking(True)
         self.setCursor(QtCore.Qt.CursorShape.BlankCursor)
 
-        self.render_timer = QtCore.QTimer(self)
-        self.render_timer.timeout.connect(self.update_scene)
-        self.render_timer.start(0)
+        self.render_timer: QtCore.QTimer | None = None
 
     def sizeHint(self):
         return QtCore.QSize(1280, 720)
@@ -96,6 +94,11 @@ class PlanetWidget(QOpenGLWidget):
         )
         self.camera.speed = self.base_speed
         self._update_camera_bounds()
+
+        if self.render_timer is None:
+            self.render_timer = QtCore.QTimer(self)
+            self.render_timer.timeout.connect(self.update_scene)
+            self.render_timer.start(0)
 
     def _create_quad(self):
         self.quad_vao_obj = QtGui.QOpenGLVertexArrayObject(self)

@@ -4,7 +4,6 @@ from OpenGL.GL import *
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
-from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera
 from gl_utils.program import create_program
 from rendering.constants import PlanetParameters
@@ -32,6 +31,8 @@ class PlanetWidget(QOpenGLWidget):
         self.setFormat(QtGui.QSurfaceFormat.defaultFormat())
         self.parameters = parameters
         self.quad_vao = None
+        self.quad_vao_obj: QtGui.QOpenGLVertexArrayObject | None = None
+        self.quad_vbo = None
         self.renderer = None
         self.camera = None
         self.layer_visibility = [False] * 9
@@ -53,7 +54,7 @@ class PlanetWidget(QOpenGLWidget):
 
     def initializeGL(self):
         glEnable(GL_DEPTH_TEST)
-        self.quad_vao = create_fullscreen_quad()
+        self._create_quad()
 
         version = glGetString(GL_VERSION)
         renderer = glGetString(GL_RENDERER)
@@ -96,6 +97,40 @@ class PlanetWidget(QOpenGLWidget):
         self.camera.speed = self.base_speed
         self._update_camera_bounds()
 
+    def _create_quad(self):
+        self.quad_vao_obj = QtGui.QOpenGLVertexArrayObject(self)
+        if not self.quad_vao_obj.create():
+            raise RuntimeError("Failed to create vertex array object")
+
+        vertices = np.array(
+            [
+                -1.0,
+                -1.0,
+                1.0,
+                -1.0,
+                1.0,
+                1.0,
+                -1.0,
+                -1.0,
+                1.0,
+                1.0,
+                -1.0,
+                1.0,
+            ],
+            dtype=np.float32,
+        )
+
+        with QtGui.QOpenGLVertexArrayObject.Binder(self.quad_vao_obj):
+            self.quad_vbo = glGenBuffers(1)
+            glBindBuffer(GL_ARRAY_BUFFER, self.quad_vbo)
+            glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+            glEnableVertexAttribArray(0)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * 4, None)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        self.quad_vao = self.quad_vao_obj.objectId()
+
     def _update_camera_bounds(self):
         if not self.camera:
             return
@@ -133,7 +168,8 @@ class PlanetWidget(QOpenGLWidget):
     def paintGL(self):
         if not self.renderer or not self.camera:
             return
-        glBindVertexArray(int(self.quad_vao))
+        if self.quad_vao_obj:
+            self.quad_vao_obj.bind()
         self.renderer.render(
             self.camera.position,
             self.camera.front,
@@ -143,6 +179,8 @@ class PlanetWidget(QOpenGLWidget):
             self.height(),
             self.layer_visibility,
         )
+        if self.quad_vao_obj:
+            self.quad_vao_obj.release()
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):
         pos = event.position()

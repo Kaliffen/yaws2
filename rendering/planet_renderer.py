@@ -73,7 +73,9 @@ class PlanetRenderer:
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
 
-        # Pass 1: populate G-buffer
+        # Pass 1: populate G-buffer (depth-tested)
+        glEnable(GL_DEPTH_TEST)
+        glDepthMask(GL_TRUE)
         glBindFramebuffer(GL_FRAMEBUFFER, self.gbuffer["fbo"])
         glViewport(0, 0, width, height)
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -104,6 +106,7 @@ class PlanetRenderer:
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["material"])
         set_int(self.lighting_program, "gMaterial", 2)
 
+        glDisable(GL_DEPTH_TEST)
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
         # Pass 3: atmosphere

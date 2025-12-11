@@ -22,13 +22,7 @@ uniform vec2 resolution;
 
 // Water Parameters
 uniform vec3 waterColor;
-uniform float waterAbsorption;
-uniform float waterScattering;
-uniform float cloudBaseAltitude;
-uniform float cloudLayerThickness;
 uniform float cloudCoverage;
-uniform float cloudDensity;
-uniform vec3 cloudLightColor;
 
 // Helpers
 float hash(vec3 p) {

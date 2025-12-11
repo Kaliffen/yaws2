@@ -35,6 +35,8 @@ def create_texture(width, height, attachment, internal_format=GL_RGBA16F, format
     glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0, format, type, None)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
     glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, tex, 0)
     return tex
 
@@ -65,6 +67,31 @@ def create_gbuffer(width, height):
         "normal": gNormalFlags,
         "material": gMaterial,
         "rbo": rbo,
+        "width": width,
+        "height": height,
+    }
+
+
+def create_color_fbo(width, height, num_attachments=1, internal_format=GL_RGBA16F):
+    fbo = glGenFramebuffers(1)
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+
+    attachments = []
+    textures = []
+    for i in range(num_attachments):
+        attachment = GL_COLOR_ATTACHMENT0 + i
+        attachments.append(attachment)
+        textures.append(create_texture(width, height, attachment, internal_format))
+
+    glDrawBuffers(len(attachments), attachments)
+
+    if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+        raise RuntimeError("Color framebuffer is not complete")
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0)
+    return {
+        "fbo": fbo,
+        "textures": textures,
         "width": width,
         "height": height,
     }

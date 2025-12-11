@@ -59,7 +59,7 @@ def main():
     base_speed = 60.0
     camera.speed = base_speed
     surface_radius = PLANET_RADIUS + HEIGHT_SCALE
-    camera.min_radius = surface_radius + HEIGHT_SCALE * 0.25
+    camera.min_radius = surface_radius-  HEIGHT_SCALE * 0.95
 
     renderer = PlanetRenderer(gbuffer_program, composite_program)
     timer = DeltaTimer()

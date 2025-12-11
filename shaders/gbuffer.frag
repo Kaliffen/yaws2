@@ -99,7 +99,7 @@ vec3 rayDirection(vec2 uv) {
 
 bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     t = 0.0;
-    float eps = max(heightScale * 0.02, planetRadius * 0.0001);
+    float eps = max(heightScale * 0.01, planetRadius * 0.0001);
     for (int i = 0; i < 320; i++) {
         vec3 p = ro + rd * t;
         float d = planetSDF(p);
@@ -107,7 +107,7 @@ bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
             pos = p;
             return true;
         }
-        t += max(d * 0.7, eps * 0.5);
+        t += max(d * 0.17, eps * 0.5);
         if (t > maxRayDistance) break;
     }
     return false;
@@ -144,6 +144,7 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
     float seaLevelHeight = seaLevel;
     float heightAboveSea = h - seaLevelHeight;
     float normalizedHeight = heightAboveSea / max(heightScale, 0.0001);
+    normalizedHeight = normalizedHeight * 5;
 
     // Keep the coastline as a relatively thin band so inland regions pick up the
     // intended greens and browns instead of the sandy coastline tint.

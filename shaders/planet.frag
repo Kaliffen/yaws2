@@ -172,7 +172,7 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     float seaLevelHeight = seaLevel;  // water height (planetRadius + seaLevel)
     float heightAboveSea = h - seaLevelHeight;
     float normalizedHeight = heightAboveSea / max(heightScale, 0.0001);
-
+    normalizedHeight = normalizedHeight * 5;
     // Keep the coastline band thin so inland areas show their intended biomes.
     float coastBlend = smoothstep(-0.06, 0.04, normalizedHeight);
     float landBlend = smoothstep(0.02, 0.32, normalizedHeight);

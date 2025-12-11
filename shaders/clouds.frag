@@ -120,12 +120,13 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
     bool hitsInner = intersectSphere(rayOrigin, rayDir, baseRadius, tInner0, tInner1);
 
     float start = max(tOuter0, 0.0);
-    if (hitsInner) {
-        // If we're outside the cloud shell, begin at the near-side entry into the
-        // inner sphere. If we're already inside the inner sphere (e.g., on the
-        // surface), skip ahead to the far-side exit so we don't march beneath the
-        // cloud base.
-        start = max(start, tInner0 > 0.0 ? tInner0 : tInner1);
+
+    // When the camera is below the cloud base (inside the inner sphere), skip
+    // forward to the exit so we only march through the actual cloud volume.
+    // Otherwise, keep the outer entry so near-side cloud density still blends
+    // over the surface instead of popping in only above the base radius.
+    if (hitsInner && tInner0 < 0.0) {
+        start = max(start, tInner1);
     }
     float end = min(tOuter1, maxDistance);
     if (end <= start) {

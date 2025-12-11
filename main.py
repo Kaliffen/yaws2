@@ -383,14 +383,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 def main():
-    app = QtWidgets.QApplication(sys.argv)
-
     fmt = QtGui.QSurfaceFormat()
     fmt.setVersion(4, 1)
     fmt.setProfile(QtGui.QSurfaceFormat.CoreProfile)
     fmt.setDepthBufferSize(24)
     fmt.setStencilBufferSize(8)
     QtGui.QSurfaceFormat.setDefaultFormat(fmt)
+
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_UseDesktopOpenGL)
+
+    app = QtWidgets.QApplication(sys.argv)
 
     window = MainWindow()
     window.resize(1600, 900)

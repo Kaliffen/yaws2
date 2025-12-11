@@ -144,10 +144,10 @@ void main() {
     vec3 albedo = material.rgb;
     float cloudDensity = material.a;
 
-    // Treat water samples as surface hits even when the stored terrain height
-    // is below sea level (negative). This keeps oceans from being multiplied
-    // by a zero shadow term and turning black.
-    bool hit = (heightValue >= 0.0) || (waterFlag > 0.5);
+    // gBuffer encodes hits via waterFlag: -1 = miss, 0 = land, 1 = water.
+    // Rely on that flag instead of the terrain height sign so land below the
+    // reference radius still shades correctly.
+    bool hit = waterFlag > -0.5;
 
     // Layer: SDF depth visualization
     float sdfDepth = clamp(length(pos) / maxRayDistance, 0.0, 1.0);

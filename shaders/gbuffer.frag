@@ -132,10 +132,12 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
     return true;
 }
 
-vec3 landColor(float h) {
+vec3 landColor(vec3 p, vec3 normal, float h) {
     vec3 ocean = vec3(0.026, 0.16, 0.32);
     vec3 coast = vec3(0.82, 0.75, 0.6);
-    vec3 land = vec3(0.16, 0.4, 0.18);
+    vec3 landLow = vec3(0.18, 0.42, 0.2);
+    vec3 landHigh = vec3(0.36, 0.34, 0.22);
+    vec3 landRock = vec3(0.38, 0.36, 0.33);
     vec3 mountain = vec3(0.55, 0.56, 0.6);
     vec3 snow = vec3(0.92, 0.95, 0.98);
 
@@ -145,8 +147,17 @@ vec3 landColor(float h) {
     float mountainBlend = smoothstep(seaLevelHeight + heightScale * 0.45, seaLevelHeight + heightScale * 0.7, h);
     float snowBlend = smoothstep(seaLevelHeight + heightScale * 0.75, seaLevelHeight + heightScale * 0.92, h);
 
+    float heightNorm = clamp((h - seaLevelHeight) / max(heightScale, 0.0001), 0.0, 1.0);
+    float slope = 1.0 - clamp(dot(normalize(p), normal), 0.0, 1.0);
+    float slopeRock = smoothstep(0.28, 0.7, slope);
+    float colorNoise = fbm(normalize(p) * 12.0 + vec3(3.7, 1.3, 6.2));
+    float heightMix = clamp(heightNorm * 1.2 + colorNoise * 0.25, 0.0, 1.0);
+
+    vec3 variedLand = mix(landLow, landHigh, heightMix);
+    variedLand = mix(variedLand, landRock, slopeRock * 0.65);
+
     vec3 color = mix(ocean, coast, coastBlend);
-    color = mix(color, land, landBlend);
+    color = mix(color, variedLand, landBlend);
     color = mix(color, mountain, mountainBlend);
     color = mix(color, snow, snowBlend);
     return color;
@@ -177,7 +188,7 @@ void main() {
     if (hit) {
         float d0 = planetSDF(pos);
         normal = computeNormal(pos, d0);
-        baseColor = landColor(heightValue);
+        baseColor = landColor(pos, normal, heightValue);
         waterFlag = 0.0;
     }
 

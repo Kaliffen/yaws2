@@ -56,7 +56,7 @@ def main():
     )
     # Start with a modest base speed so surface traversal feels grounded. Speed
     # ramps up automatically as you get farther from the planet.
-    base_speed = 30.0
+    base_speed = 60.0
     camera.speed = base_speed
     surface_radius = PLANET_RADIUS + HEIGHT_SCALE
     camera.min_radius = surface_radius + HEIGHT_SCALE * 0.25

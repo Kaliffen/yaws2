@@ -24,6 +24,11 @@ uniform vec2 resolution;
 uniform vec3 waterColor;
 uniform float waterAbsorption;
 uniform float waterScattering;
+uniform float cloudBaseAltitude;
+uniform float cloudLayerThickness;
+uniform float cloudCoverage;
+uniform float cloudDensity;
+uniform vec3 cloudLightColor;
 
 // Helpers
 float hash(vec3 p) {
@@ -60,6 +65,14 @@ float fbm(vec3 p) {
         a *= 0.5;
     }
     return v;
+}
+
+float cloudCoverageField(vec3 dir) {
+    float bands = fbm(dir * 3.1 + vec3(1.7, -2.2, 0.5));
+    float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
+    float coverage = bands * 0.65 + streaks * 0.45;
+    coverage = coverage * cloudCoverage + 0.12;
+    return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
 }
 
 // Terrain Height and SDF
@@ -209,7 +222,7 @@ void main() {
         pos = ro + rd * maxRayDistance;
     }
 
-    float cloudDensity = 0.0;
+    float cloudMask = 0.0;
 
     // Only accumulate cloud noise when the view ray actually passes through the
     // atmosphere (or hits the surface). Otherwise distant space renders pick up
@@ -217,10 +230,11 @@ void main() {
     float tAtm0, tAtm1;
     bool throughAtmosphere = hit || (intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
     if (throughAtmosphere) {
-        cloudDensity = clamp(fbm(normalize(rd) * 2.5 + vec3(0.3, 0.1, -0.4)) * 0.6, 0.0, 1.0);
+        vec3 coverageSample = hit ? pos : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
+        cloudMask = cloudCoverageField(normalize(coverageSample));
     }
 
     gPositionHeight = vec4(pos, heightValue);
     gNormalFlags = vec4(normal, waterFlag);
-    gMaterial = vec4(baseColor, cloudDensity);
+    gMaterial = vec4(baseColor, cloudMask);
 }

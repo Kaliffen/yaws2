@@ -1,40 +1,51 @@
-﻿import numpy as np
+import numpy as np
+from dataclasses import dataclass, field
 
-SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
 
-# Base scale values for the planet and atmosphere (kilometers)
-# Use a realistic Earth-sized radius so the horizon and curvature feel correct
-# when flying close to the surface.
-PLANET_RADIUS = 6371.0
+@dataclass
+class PlanetParameters:
+    sun_direction: np.ndarray = field(
+        default_factory=lambda: np.array([0.62, 0.32, 0.71], dtype=np.float32)
+    )
+    planet_radius: float = 6371.0
+    atmosphere_radius: float | None = None
+    height_scale: float = 532.2
+    sea_level: float = -35.0
+    water_color: np.ndarray = field(
+        default_factory=lambda: np.array([0.02, 0.16, 0.34], dtype=np.float32)
+    )
+    water_absorption: float = 0.24
+    water_scattering: float = 0.14
+    max_ray_distance: float | None = None
+    cloud_base_altitude: float = 6.5
+    cloud_layer_thickness: float = 8.0
+    cloud_coverage: float = 0.62
+    cloud_density: float = 0.85
+    cloud_light_color: np.ndarray = field(
+        default_factory=lambda: np.array([1.0, 0.97, 0.94], dtype=np.float32)
+    )
 
-# Keep a thin atmospheric shell around the surface (~110 km thick).
-ATMOSPHERE_RADIUS = PLANET_RADIUS + 210.0
+    def __post_init__(self):
+        if self.atmosphere_radius is None:
+            self.atmosphere_radius = self.planet_radius + 210.0
+        if self.max_ray_distance is None:
+            self.max_ray_distance = self.planet_radius * 3.0
 
-# Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 532.2
 
-# Water parameters
-# Interpret sea level as a world-space height offset instead of a fractional
-# multiplier so the shader math stays consistent. A small positive offset keeps
-# shallow coastlines without burying continents.
-SEA_LEVEL = -35.0  # kilometers above the planet radius
-# Slightly brighter water with a touch more scattering makes oceans stand out
-# against land.
-WATER_COLOR = np.array([0.02, 0.16, 0.34], dtype=np.float32)
-WATER_ABSORPTION = 0.24
-WATER_SCATTERING = 0.14
+# Preserve direct constant-style defaults for modules that still import them.
+DEFAULT_PARAMETERS = PlanetParameters()
 
-# Raymarch distances scale with the planet to ensure intersections are found
-# reliably without overshooting. A longer distance avoids missing the planet
-# when pulling far back for full-globe views.
-MAX_RAY_DISTANCE = PLANET_RADIUS * 3.0
-
-# Cloud parameters keep volumetric sampling anchored to the planet instead of the
-# screen. A shallow layer near the surface produces convincing low-altitude
-# clouds without spilling deep into the atmosphere.
-CLOUD_BASE_ALTITUDE = 6.5
-CLOUD_LAYER_THICKNESS = 8.0
-CLOUD_COVERAGE = 0.62
-CLOUD_DENSITY = 0.85
-CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
+SUN_DIRECTION = DEFAULT_PARAMETERS.sun_direction
+PLANET_RADIUS = DEFAULT_PARAMETERS.planet_radius
+ATMOSPHERE_RADIUS = DEFAULT_PARAMETERS.atmosphere_radius
+HEIGHT_SCALE = DEFAULT_PARAMETERS.height_scale
+SEA_LEVEL = DEFAULT_PARAMETERS.sea_level
+WATER_COLOR = DEFAULT_PARAMETERS.water_color
+WATER_ABSORPTION = DEFAULT_PARAMETERS.water_absorption
+WATER_SCATTERING = DEFAULT_PARAMETERS.water_scattering
+MAX_RAY_DISTANCE = DEFAULT_PARAMETERS.max_ray_distance
+CLOUD_BASE_ALTITUDE = DEFAULT_PARAMETERS.cloud_base_altitude
+CLOUD_LAYER_THICKNESS = DEFAULT_PARAMETERS.cloud_layer_thickness
+CLOUD_COVERAGE = DEFAULT_PARAMETERS.cloud_coverage
+CLOUD_DENSITY = DEFAULT_PARAMETERS.cloud_density
+CLOUD_LIGHT_COLOR = DEFAULT_PARAMETERS.cloud_light_color

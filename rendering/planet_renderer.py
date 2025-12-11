@@ -1,30 +1,18 @@
 from OpenGL.GL import *
 
 from gl_utils.buffers import create_color_fbo, create_gbuffer
-from rendering.constants import (
-    ATMOSPHERE_RADIUS,
-    CLOUD_BASE_ALTITUDE,
-    CLOUD_COVERAGE,
-    CLOUD_DENSITY,
-    CLOUD_LAYER_THICKNESS,
-    CLOUD_LIGHT_COLOR,
-    HEIGHT_SCALE,
-    MAX_RAY_DISTANCE,
-    PLANET_RADIUS,
-    SEA_LEVEL,
-    SUN_DIRECTION,
-    WATER_COLOR,
-)
+from rendering.constants import PlanetParameters
 from rendering.uniforms import set_float, set_int, set_vec2, set_vec3
 
 
 class PlanetRenderer:
-    def __init__(self, gbuffer_program, lighting_program, atmosphere_program, cloud_program, composite_program):
+    def __init__(self, gbuffer_program, lighting_program, atmosphere_program, cloud_program, composite_program, parameters: PlanetParameters):
         self.gbuffer_program = gbuffer_program
         self.lighting_program = lighting_program
         self.atmosphere_program = atmosphere_program
         self.cloud_program = cloud_program
         self.composite_program = composite_program
+        self.parameters = parameters
         self.gbuffer = None
         self.lighting_buffer = None
         self.atmosphere_buffer = None
@@ -54,25 +42,28 @@ class PlanetRenderer:
         self.cloud_buffer = create_color_fbo(width, height)
 
     def _bind_common_uniforms(self, program, width, height):
+        params = self.parameters
         set_vec3(program, "camPos", self.cam_pos)
         set_vec3(program, "camForward", self.cam_forward)
         set_vec3(program, "camRight", self.cam_right)
         set_vec3(program, "camUp", self.cam_up)
-        set_vec3(program, "sunDir", SUN_DIRECTION)
-        set_float(program, "planetRadius", PLANET_RADIUS)
-        set_float(program, "atmosphereRadius", ATMOSPHERE_RADIUS)
-        set_float(program, "heightScale", HEIGHT_SCALE)
-        set_float(program, "maxRayDistance", MAX_RAY_DISTANCE)
-        set_float(program, "seaLevel", SEA_LEVEL)
-        set_float(program, "cloudBaseAltitude", CLOUD_BASE_ALTITUDE)
-        set_float(program, "cloudLayerThickness", CLOUD_LAYER_THICKNESS)
-        set_float(program, "cloudCoverage", CLOUD_COVERAGE)
-        set_float(program, "cloudDensity", CLOUD_DENSITY)
-        set_vec3(program, "cloudLightColor", CLOUD_LIGHT_COLOR)
+        set_vec3(program, "sunDir", params.sun_direction)
+        set_float(program, "planetRadius", params.planet_radius)
+        set_float(program, "atmosphereRadius", params.atmosphere_radius)
+        set_float(program, "heightScale", params.height_scale)
+        set_float(program, "maxRayDistance", params.max_ray_distance)
+        set_float(program, "seaLevel", params.sea_level)
+        set_float(program, "cloudBaseAltitude", params.cloud_base_altitude)
+        set_float(program, "cloudLayerThickness", params.cloud_layer_thickness)
+        set_float(program, "cloudCoverage", params.cloud_coverage)
+        set_float(program, "cloudDensity", params.cloud_density)
+        set_vec3(program, "cloudLightColor", params.cloud_light_color)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))
 
-        set_vec3(program, "waterColor", WATER_COLOR)
+        set_vec3(program, "waterColor", params.water_color)
+        set_float(program, "waterAbsorption", params.water_absorption)
+        set_float(program, "waterScattering", params.water_scattering)
 
     def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, layer_visibility):
         self.cam_pos = cam_pos

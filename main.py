@@ -29,6 +29,7 @@ def _normalize(vec):
 class PlanetWidget(QOpenGLWidget):
     def __init__(self, parameters: PlanetParameters, parent=None):
         super().__init__(parent)
+        self.setFormat(QtGui.QSurfaceFormat.defaultFormat())
         self.parameters = parameters
         self.quad_vao = None
         self.renderer = None
@@ -53,6 +54,11 @@ class PlanetWidget(QOpenGLWidget):
     def initializeGL(self):
         glEnable(GL_DEPTH_TEST)
         self.quad_vao = create_fullscreen_quad()
+
+        version = glGetString(GL_VERSION)
+        renderer = glGetString(GL_RENDERER)
+        if version is not None and renderer is not None:
+            print(f"GL version: {version.decode('utf-8')}, renderer: {renderer.decode('utf-8')}")
 
         with open("shaders/planet.vert") as f:
             vert_src = f.read()
@@ -127,7 +133,7 @@ class PlanetWidget(QOpenGLWidget):
     def paintGL(self):
         if not self.renderer or not self.camera:
             return
-        glBindVertexArray(self.quad_vao)
+        glBindVertexArray(int(self.quad_vao))
         self.renderer.render(
             self.camera.position,
             self.camera.front,
@@ -384,6 +390,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def main():
     fmt = QtGui.QSurfaceFormat()
+    fmt.setRenderableType(QtGui.QSurfaceFormat.OpenGL)
     fmt.setVersion(4, 1)
     fmt.setProfile(QtGui.QSurfaceFormat.CoreProfile)
     fmt.setDepthBufferSize(24)

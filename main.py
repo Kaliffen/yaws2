@@ -181,6 +181,7 @@ class PlanetWidget(QOpenGLWidget):
                     target_width,
                     target_height,
                     self.layer_visibility,
+                    self.defaultFramebufferObject(),
                 )
         else:
             self.renderer.render(
@@ -191,6 +192,7 @@ class PlanetWidget(QOpenGLWidget):
                 target_width,
                 target_height,
                 self.layer_visibility,
+                self.defaultFramebufferObject(),
             )
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):

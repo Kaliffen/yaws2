@@ -65,7 +65,17 @@ class PlanetRenderer:
         set_float(program, "waterAbsorption", params.water_absorption)
         set_float(program, "waterScattering", params.water_scattering)
 
-    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, layer_visibility):
+    def render(
+        self,
+        cam_pos,
+        cam_front,
+        cam_right,
+        cam_up,
+        width,
+        height,
+        layer_visibility,
+        target_fbo=0,
+    ):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
@@ -150,7 +160,7 @@ class PlanetRenderer:
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
         # Pass 5: composite and debug layers
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, target_fbo)
         glViewport(0, 0, width, height)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 

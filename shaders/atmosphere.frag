@@ -68,8 +68,11 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float altitudeFalloff = mix(1.0, 0.25, altitudeNorm * altitudeNorm);
 
     vec3 lightDir = normalize(sunDir);
-    float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 3.5);
+    float horizonDot = dot(rayDir, normalize(rayOrigin));
+    // Treat inward-facing rays like horizon views so orbital vantage points still
+    // accumulate visible scatter instead of being clamped away by the absolute
+    // value. Only suppress the factor when looking away from the planet.
+    float horizonFactor = pow(clamp(1.0 - max(horizonDot, 0.0), 0.0, 1.0), 3.5);
 
     float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
     float sunWrap = clamp(sunFacing * 0.6 + 0.4, 0.0, 1.0);

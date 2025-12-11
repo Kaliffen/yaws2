@@ -56,6 +56,17 @@ vec3 rayDirection(vec2 uv) {
     return normalize(camForward + uv.x * camRight + uv.y * camUp);
 }
 
+bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
+    float b = dot(ro, rd);
+    float c = dot(ro, ro) - R * R;
+    float h = b * b - c;
+    if (h < 0.0) return false;
+    h = sqrt(h);
+    t0 = -b - h;
+    t1 = -b + h;
+    return true;
+}
+
 float atmosphereDensity(vec3 p) {
     float altitude = length(p) - planetRadius;
     float thickness = max(atmosphereRadius - planetRadius, 0.001);
@@ -64,43 +75,60 @@ float atmosphereDensity(vec3 p) {
 }
 
 float computeShadow(vec3 pos, vec3 normal) {
-    float ndl = dot(normal, sunDir);
+    vec3 lightDir = normalize(sunDir);
+    float ndl = dot(normal, lightDir);
     float horizon = smoothstep(-0.2, 0.05, ndl);
     return clamp(ndl * 0.5 + 0.5, 0.0, 1.0) * horizon;
 }
 
 vec3 shadeWater(vec3 pos, vec3 normal, vec3 albedo, float depth) {
-    float ndl = max(dot(normal, sunDir), 0.0);
+    vec3 lightDir = normalize(sunDir);
+    float ndl = max(dot(normal, lightDir), 0.0);
     float fresnel = 0.04 + pow(1.0 - clamp(dot(normal, normalize(pos - camPos)), 0.0, 1.0), 5.0);
     vec3 reflected = albedo * (0.4 + 0.6 * ndl);
     float depthDarken = clamp(depth * 0.06, 0.0, 1.0);
     vec3 transmitted = mix(albedo * 1.35, albedo, depthDarken) * exp(-depth * 0.12);
     vec3 color = mix(transmitted, reflected, fresnel);
-    color += pow(max(dot(reflect(-sunDir, normal), normalize(pos - camPos)), 0.0), 48.0) * 0.25;
+    color += pow(max(dot(reflect(-lightDir, normal), normalize(pos - camPos)), 0.0), 48.0) * 0.25;
     return color;
 }
 
 vec3 computeAtmosphere(vec3 viewDir, vec3 pos, bool hit) {
-    vec3 surfaceDir = hit ? normalize(pos) : normalize(viewDir);
-    float horizonDot = clamp(dot(viewDir, surfaceDir), -1.0, 1.0);
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 5.5);
+    vec3 lightDir = normalize(sunDir);
+    vec3 rayOrigin = camPos;
+    vec3 rayDir = normalize(viewDir);
 
-    float viewHeight = max(length(camPos) - planetRadius, 0.0);
+    float t0, t1;
+    bool intersects = intersectSphere(rayOrigin, rayDir, atmosphereRadius, t0, t1) && t1 > 0.0;
+    if (!intersects) {
+        return vec3(0.0);
+    }
+
+    if (t0 < 0.0) t0 = 0.0;
+    float rayEnd = hit ? min(t1, length(pos - rayOrigin)) : t1;
+    float pathLength = max(rayEnd - t0, 0.0);
+
+    float viewHeight = max(length(rayOrigin) - planetRadius, 0.0);
     float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
     float altitudeNorm = clamp(viewHeight / atmThickness, 0.0, 1.0);
-    float altitudeFalloff = mix(1.0, 0.2, altitudeNorm * altitudeNorm);
-    float densityAlongView = atmosphereDensity(surfaceDir * planetRadius + surfaceDir * atmThickness * 0.6);
+    float altitudeFalloff = mix(1.0, 0.25, altitudeNorm * altitudeNorm);
 
-    float sunFacing = dot(surfaceDir, sunDir);
-    float sunWrap = clamp(sunFacing * 0.55 + 0.45, 0.0, 1.0);
-    float sunVisibility = smoothstep(-0.2, 0.15, sunFacing);
-    float mieForward = pow(clamp(0.5 + 0.5 * dot(viewDir, sunDir), 0.0, 1.0), 4.0);
+    // Encourage a visible horizon glow even when looking almost straight down.
+    float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
+    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 3.5);
 
-    float scatter = horizonFactor * (0.22 + 0.78 * sunWrap * sunVisibility)
-                  * altitudeFalloff * (0.35 + 0.65 * densityAlongView);
-    scatter += mieForward * 0.08 * sunVisibility;
+    float sunFacing = dot(normalize(rayOrigin + rayDir * max(t0, 0.0)), lightDir);
+    float sunWrap = clamp(sunFacing * 0.6 + 0.4, 0.0, 1.0);
+    float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0);
 
-    vec3 atmosphereColor = vec3(0.3, 0.56, 0.96);
+    float pathFactor = smoothstep(0.0, atmThickness, pathLength);
+    float density = (0.35 + 0.65 * (1.0 - altitudeNorm)) * pathFactor;
+
+    float scatter = horizonFactor * (0.22 + 0.78 * sunWrap) * altitudeFalloff * density;
+    scatter += mieForward * 0.08 * sunWrap;
+    scatter = max(scatter, 0.02 * pathFactor); // Prevent a totally black atmosphere
+
+    vec3 atmosphereColor = vec3(0.32, 0.58, 0.96);
     return atmosphereColor * scatter;
 }
 
@@ -128,7 +156,8 @@ void main() {
     float heightView = clamp((heightValue + heightScale) / (heightScale * 2.0), 0.0, 1.0);
 
     // Lighting
-    float ndl = max(dot(normal, sunDir), 0.0);
+    vec3 lightDir = normalize(sunDir);
+    float ndl = max(dot(normal, lightDir), 0.0);
     float horizonBlend = smoothstep(0.0, 0.22, ndl);
     float ambient = 0.08;
     float lighting = hit ? clamp(ambient + ndl * horizonBlend, 0.0, 1.0) : 0.0;

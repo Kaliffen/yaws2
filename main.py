@@ -168,19 +168,30 @@ class PlanetWidget(QOpenGLWidget):
     def paintGL(self):
         if not self.renderer or not self.camera:
             return
+        dpr = self.devicePixelRatioF()
+        target_width = int(self.width() * dpr)
+        target_height = int(self.height() * dpr)
         if self.quad_vao_obj:
-            self.quad_vao_obj.bind()
-        self.renderer.render(
-            self.camera.position,
-            self.camera.front,
-            self.camera.right,
-            self.camera.up,
-            self.width(),
-            self.height(),
-            self.layer_visibility,
-        )
-        if self.quad_vao_obj:
-            self.quad_vao_obj.release()
+            with QtGui.QOpenGLVertexArrayObject.Binder(self.quad_vao_obj):
+                self.renderer.render(
+                    self.camera.position,
+                    self.camera.front,
+                    self.camera.right,
+                    self.camera.up,
+                    target_width,
+                    target_height,
+                    self.layer_visibility,
+                )
+        else:
+            self.renderer.render(
+                self.camera.position,
+                self.camera.front,
+                self.camera.right,
+                self.camera.up,
+                target_width,
+                target_height,
+                self.layer_visibility,
+            )
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):
         pos = event.position()

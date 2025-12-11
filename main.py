@@ -41,10 +41,19 @@ def main():
         vert_src = f.read()
     with open("shaders/gbuffer.frag") as f:
         gbuffer_src = f.read()
+    with open("shaders/lighting.frag") as f:
+        lighting_src = f.read()
+    with open("shaders/atmosphere.frag") as f:
+        atmosphere_src = f.read()
+    with open("shaders/clouds.frag") as f:
+        cloud_src = f.read()
     with open("shaders/composite.frag") as f:
         composite_src = f.read()
 
     gbuffer_program = create_program(vert_src, gbuffer_src)
+    lighting_program = create_program(vert_src, lighting_src)
+    atmosphere_program = create_program(vert_src, atmosphere_src)
+    cloud_program = create_program(vert_src, cloud_src)
     composite_program = create_program(vert_src, composite_src)
 
     glUseProgram(gbuffer_program)
@@ -61,7 +70,13 @@ def main():
     surface_radius = PLANET_RADIUS + HEIGHT_SCALE
     camera.min_radius = surface_radius-  HEIGHT_SCALE * 0.95
 
-    renderer = PlanetRenderer(gbuffer_program, composite_program)
+    renderer = PlanetRenderer(
+        gbuffer_program,
+        lighting_program,
+        atmosphere_program,
+        cloud_program,
+        composite_program,
+    )
     timer = DeltaTimer()
 
     layer_visibility = [False] * 9

@@ -184,6 +184,8 @@ class PlanetWidget(QOpenGLWidget):
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):
         pos = event.position()
+        if self.camera is None:
+            return
         if self.last_mouse_pos is None:
             self.last_mouse_pos = pos
             return

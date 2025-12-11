@@ -185,6 +185,7 @@ class PlanetWidget(QOpenGLWidget):
                     target_height,
                     self.layer_visibility,
                     self.defaultFramebufferObject(),
+                    quad_vao=self.quad_vao,
                 )
         else:
             self.renderer.render(
@@ -196,6 +197,7 @@ class PlanetWidget(QOpenGLWidget):
                 target_height,
                 self.layer_visibility,
                 self.defaultFramebufferObject(),
+                quad_vao=self.quad_vao,
             )
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):

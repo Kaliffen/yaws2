@@ -142,12 +142,17 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
     vec3 snow = vec3(0.92, 0.95, 0.98);
 
     float seaLevelHeight = seaLevel;
-    float coastBlend = smoothstep(seaLevelHeight - heightScale * 0.14, seaLevelHeight + heightScale * 0.06, h);
-    float landBlend = smoothstep(seaLevelHeight + heightScale * 0.03, seaLevelHeight + heightScale * 0.4, h);
-    float mountainBlend = smoothstep(seaLevelHeight + heightScale * 0.45, seaLevelHeight + heightScale * 0.7, h);
-    float snowBlend = smoothstep(seaLevelHeight + heightScale * 0.75, seaLevelHeight + heightScale * 0.92, h);
+    float heightAboveSea = h - seaLevelHeight;
+    float normalizedHeight = heightAboveSea / max(heightScale, 0.0001);
 
-    float heightNorm = clamp((h - seaLevelHeight) / max(heightScale, 0.0001), 0.0, 1.0);
+    // Keep the coastline as a relatively thin band so inland regions pick up the
+    // intended greens and browns instead of the sandy coastline tint.
+    float coastBlend = smoothstep(-0.06, 0.04, normalizedHeight);
+    float landBlend = smoothstep(0.02, 0.32, normalizedHeight);
+    float mountainBlend = smoothstep(0.35, 0.62, normalizedHeight);
+    float snowBlend = smoothstep(0.65, 0.9, normalizedHeight);
+
+    float heightNorm = clamp(normalizedHeight, 0.0, 1.0);
     float slope = 1.0 - clamp(dot(normalize(p), normal), 0.0, 1.0);
     float slopeRock = smoothstep(0.28, 0.7, slope);
     float colorNoise = fbm(normalize(p) * 12.0 + vec3(3.7, 1.3, 6.2));

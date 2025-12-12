@@ -112,8 +112,9 @@ void main() {
 
     float rawNdl = dot(normal, lightDir);
     float ndl = max(rawNdl, 0.0);
-    float wrapNdl = clamp((rawNdl + 0.35) / 1.35, 0.0, 1.0);
-    float horizonBlend = smoothstep(-0.08, 0.32, rawNdl);
+    float wrapNdl = clamp((rawNdl + 0.65) / 1.65, 0.0, 1.0);
+    float horizonBlend = smoothstep(-0.35, 0.45, rawNdl);
+    float softHalo = smoothstep(-0.68, -0.08, rawNdl) * (1.0 - horizonBlend);
     float sunHeight = dot(normalize(pos), lightDir);
 
     vec3 sunColor = computeSunTint(pos, lightDir);
@@ -121,8 +122,8 @@ void main() {
     vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
     float ambientStrength = mix(0.02, 0.14, twilight);
 
-    vec3 directLight = sunColor * wrapNdl * horizonBlend;
-    vec3 ambient = ambientLight * ambientStrength;
+    vec3 directLight = sunColor * (wrapNdl * horizonBlend + softHalo * 0.5);
+    vec3 ambient = ambientLight * (ambientStrength + softHalo * 0.25);
 
     float shadow = hit ? computeShadow(pos, normal) : 0.0;
 
@@ -134,7 +135,7 @@ void main() {
         color = waterShaded;
     } else {
         float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 24.0) * shadow;
-        color += spec * sunColor * 0.12;
+        color += spec * sunColor * 0.08;
     }
 
     FragColor = vec4(color, shadow);

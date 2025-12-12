@@ -21,6 +21,7 @@ class CalendarState:
     hour: int
     minute: int
     second: int
+    elapsed_seconds: float
 
 
 class PlanetCalendar:
@@ -52,6 +53,7 @@ class PlanetCalendar:
             hour=hour,
             minute=minute,
             second=second,
+            elapsed_seconds=total_seconds,
         )
 
     def current_state(self) -> CalendarState:

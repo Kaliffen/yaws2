@@ -25,7 +25,55 @@ def clamp_to_radius(camera, min_radius):
         camera.position = (camera.position / distance) * min_radius
 
 
+def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
+    presets = {
+        "Low": {
+            "planet_max_steps": 180,
+            "planet_step_scale": 0.22,
+            "planet_min_step_factor": 0.7,
+            "cloud_max_steps": 28,
+            "cloud_extinction": 0.65,
+            "cloud_phase_exponent": 2.1,
+            "max_ray_distance_factor": 2.5,
+        },
+        "Medium": {
+            "planet_max_steps": 320,
+            "planet_step_scale": 0.17,
+            "planet_min_step_factor": 0.5,
+            "cloud_max_steps": 48,
+            "cloud_extinction": 0.55,
+            "cloud_phase_exponent": 2.5,
+            "max_ray_distance_factor": 3.0,
+        },
+        "High": {
+            "planet_max_steps": 480,
+            "planet_step_scale": 0.12,
+            "planet_min_step_factor": 0.35,
+            "cloud_max_steps": 72,
+            "cloud_extinction": 0.45,
+            "cloud_phase_exponent": 3.0,
+            "max_ray_distance_factor": 3.6,
+        },
+    }
+
+    config = presets.get(preset)
+    if not config:
+        return
+
+    editing_params.planet_max_steps = config["planet_max_steps"]
+    editing_params.planet_step_scale = config["planet_step_scale"]
+    editing_params.planet_min_step_factor = config["planet_min_step_factor"]
+    editing_params.cloud_max_steps = config["cloud_max_steps"]
+    editing_params.cloud_extinction = config["cloud_extinction"]
+    editing_params.cloud_phase_exponent = config["cloud_phase_exponent"]
+    editing_params.max_ray_distance = editing_params.planet_radius * config["max_ray_distance_factor"]
+
+
 def draw_parameter_panel(editing_params: PlanetParameters):
+    io = imgui.get_io()
+    right_panel_width = max(io.display_size.x * 0.28, 360.0)
+    imgui.set_next_window_pos(io.display_size.x - right_panel_width - 12.0, 12.0, condition=imgui.FIRST_USE_EVER)
+    imgui.set_next_window_size(right_panel_width, 0.0, condition=imgui.FIRST_USE_EVER)
     imgui.begin("Planet Parameters")
 
     changed, sun_dir = imgui.input_float3("Sun direction", *editing_params.sun_direction)
@@ -68,9 +116,6 @@ def draw_parameter_panel(editing_params: PlanetParameters):
         "Water scattering", editing_params.water_scattering, step=0.01, step_fast=0.05
     )
 
-    _, editing_params.max_ray_distance = imgui.input_float(
-        "Max ray distance", editing_params.max_ray_distance, step=50.0, step_fast=200.0
-    )
     _, editing_params.cloud_coverage = imgui.slider_float(
         "Cloud coverage", editing_params.cloud_coverage, 0.0, 1.0
     )
@@ -94,9 +139,32 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     return update_clicked, reset_clicked
 
 
-def draw_raymarch_panels(editing_params: PlanetParameters):
-    imgui.begin("Planet Raymarch")
+def draw_performance_panel(editing_params: PlanetParameters):
+    io = imgui.get_io()
+    left_panel_width = max(io.display_size.x * 0.28, 340.0)
+    imgui.set_next_window_pos(12.0, 12.0, condition=imgui.FIRST_USE_EVER)
+    imgui.set_next_window_size(left_panel_width, 0.0, condition=imgui.FIRST_USE_EVER)
+    imgui.begin("Performance & Raymarching")
 
+    imgui.text("Quality presets")
+    if imgui.button("Low", width=90):
+        apply_raymarch_preset(editing_params, "Low")
+    imgui.same_line()
+    if imgui.button("Medium", width=90):
+        apply_raymarch_preset(editing_params, "Medium")
+    imgui.same_line()
+    if imgui.button("High", width=90):
+        apply_raymarch_preset(editing_params, "High")
+
+    imgui.separator()
+
+    imgui.text("Ray distances")
+    _, editing_params.max_ray_distance = imgui.input_float(
+        "Max ray distance", editing_params.max_ray_distance, step=50.0, step_fast=200.0
+    )
+
+    imgui.separator()
+    imgui.text("Planet raymarch")
     _, editing_params.planet_max_steps = imgui.input_int(
         "Max steps", editing_params.planet_max_steps, step=1, step_fast=10
     )
@@ -109,10 +177,8 @@ def draw_raymarch_panels(editing_params: PlanetParameters):
         "Min step factor", editing_params.planet_min_step_factor, step=0.01, step_fast=0.05
     )
 
-    imgui.end()
-
-    imgui.begin("Cloud Raymarch")
-
+    imgui.separator()
+    imgui.text("Cloud raymarch")
     _, editing_params.cloud_max_steps = imgui.input_int(
         "Max steps", editing_params.cloud_max_steps, step=1, step_fast=10
     )
@@ -283,8 +349,8 @@ def main():
         framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
         width, height = framebuffer_width or width, framebuffer_height or height
 
+        draw_performance_panel(editing_params)
         update_clicked, reset_clicked = draw_parameter_panel(editing_params)
-        draw_raymarch_panels(editing_params)
 
         if update_clicked:
             parameters = editing_params.copy()

@@ -42,6 +42,15 @@ CLOUD_COVERAGE = 0.62
 CLOUD_DENSITY = 0.85
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
 
+# Raymarch controls
+PLANET_MAX_STEPS = 320
+PLANET_STEP_SCALE = 0.17
+PLANET_MIN_STEP_FACTOR = 0.5
+
+CLOUD_MAX_STEPS = 48
+CLOUD_EXTINCTION = 0.55
+CLOUD_PHASE_EXPONENT = 2.5
+
 
 def _copy_vector(vec: np.ndarray) -> np.ndarray:
     return np.array(vec, dtype=np.float32)
@@ -65,6 +74,12 @@ class PlanetParameters:
     cloud_coverage: float = CLOUD_COVERAGE
     cloud_density: float = CLOUD_DENSITY
     cloud_light_color: np.ndarray = field(default_factory=lambda: _copy_vector(CLOUD_LIGHT_COLOR))
+    planet_max_steps: int = PLANET_MAX_STEPS
+    planet_step_scale: float = PLANET_STEP_SCALE
+    planet_min_step_factor: float = PLANET_MIN_STEP_FACTOR
+    cloud_max_steps: int = CLOUD_MAX_STEPS
+    cloud_extinction: float = CLOUD_EXTINCTION
+    cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
 
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(
@@ -82,6 +97,12 @@ class PlanetParameters:
             cloud_coverage=self.cloud_coverage,
             cloud_density=self.cloud_density,
             cloud_light_color=_copy_vector(self.cloud_light_color),
+            planet_max_steps=self.planet_max_steps,
+            planet_step_scale=self.planet_step_scale,
+            planet_min_step_factor=self.planet_min_step_factor,
+            cloud_max_steps=self.cloud_max_steps,
+            cloud_extinction=self.cloud_extinction,
+            cloud_phase_exponent=self.cloud_phase_exponent,
         )
 
 

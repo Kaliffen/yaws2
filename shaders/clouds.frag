@@ -21,6 +21,9 @@ uniform float cloudDensity;
 uniform vec3 cloudLightColor;
 uniform float maxRayDistance;
 uniform float aspect;
+uniform int cloudMaxSteps;
+uniform float cloudExtinction;
+uniform float cloudPhaseExponent;
 
 float hash(vec3 p) {
     p = fract(p * 0.3183099 + vec3(0.1));
@@ -133,13 +136,13 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
 
-    const int STEPS = 48;
-    float stepSize = (end - start) / float(STEPS);
+    float stepSize = (end - start) / max(float(cloudMaxSteps), 1.0);
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
     vec3 lightDir = normalize(sunDir);
 
-    for (int i = 0; i < STEPS; i++) {
+    for (int i = 0; i < 256; i++) {
+        if (i >= cloudMaxSteps) break;
         float t = start + stepSize * (float(i) + 0.5);
         vec3 samplePos = rayOrigin + rayDir * t;
 
@@ -149,9 +152,9 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         }
 
         float lightAmount = smoothstep(0.0, 0.18, dot(normalize(samplePos), lightDir));
-        float phase = mix(0.55, 1.0, pow(max(dot(rayDir, lightDir), 0.0), 2.5));
+        float phase = mix(0.55, 1.0, pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent));
 
-        float extinction = density * stepSize * 0.55;
+        float extinction = density * stepSize * cloudExtinction;
         vec3 scatter = cloudLightColor * density * stepSize * lightAmount * mix(0.35, 1.0, phase);
 
         accum += scatter * transmittance;

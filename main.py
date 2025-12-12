@@ -88,6 +88,40 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     return update_clicked, reset_clicked
 
 
+def draw_raymarch_panels(editing_params: PlanetParameters):
+    imgui.begin("Planet Raymarch")
+
+    _, editing_params.planet_max_steps = imgui.input_int(
+        "Max steps", editing_params.planet_max_steps, step=1, step_fast=10
+    )
+    editing_params.planet_max_steps = max(editing_params.planet_max_steps, 1)
+
+    _, editing_params.planet_step_scale = imgui.input_float(
+        "Step scale", editing_params.planet_step_scale, step=0.01, step_fast=0.05
+    )
+    _, editing_params.planet_min_step_factor = imgui.input_float(
+        "Min step factor", editing_params.planet_min_step_factor, step=0.01, step_fast=0.05
+    )
+
+    imgui.end()
+
+    imgui.begin("Cloud Raymarch")
+
+    _, editing_params.cloud_max_steps = imgui.input_int(
+        "Max steps", editing_params.cloud_max_steps, step=1, step_fast=10
+    )
+    editing_params.cloud_max_steps = max(editing_params.cloud_max_steps, 1)
+
+    _, editing_params.cloud_extinction = imgui.input_float(
+        "Extinction factor", editing_params.cloud_extinction, step=0.01, step_fast=0.1
+    )
+    _, editing_params.cloud_phase_exponent = imgui.input_float(
+        "Phase exponent", editing_params.cloud_phase_exponent, step=0.1, step_fast=0.5
+    )
+
+    imgui.end()
+
+
 def main():
     if not glfw.init():
         raise RuntimeError("Failed to initialize GLFW")
@@ -238,6 +272,7 @@ def main():
         width, height = framebuffer_width or width, framebuffer_height or height
 
         update_clicked, reset_clicked = draw_parameter_panel(editing_params)
+        draw_raymarch_panels(editing_params)
 
         if update_clicked:
             parameters = editing_params.copy()

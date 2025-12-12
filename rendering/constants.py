@@ -4,6 +4,9 @@ import numpy as np
 
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
+AXIAL_TILT_DEGREES = 23.5
+TIME_OF_DAY_HOURS = 12.0
+TIME_OF_YEAR = 0.0
 
 # Base scale values for the planet and atmosphere (kilometers)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct
@@ -99,6 +102,9 @@ class PlanetParameters:
     cloud_max_steps: int = CLOUD_MAX_STEPS
     cloud_extinction: float = CLOUD_EXTINCTION
     cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
+    axial_tilt_degrees: float = AXIAL_TILT_DEGREES
+    time_of_day_hours: float = TIME_OF_DAY_HOURS
+    time_of_year: float = TIME_OF_YEAR
 
     def scale_with_planet_radius(self) -> None:
         atmosphere_thickness = self.planet_radius * (self.atmosphere_thickness_percent / 100.0)
@@ -111,6 +117,25 @@ class PlanetParameters:
         self.cloud_base_altitude = atmosphere_thickness * cloud_base_ratio
         self.cloud_layer_thickness = atmosphere_thickness * cloud_thickness_ratio
         self.max_ray_distance = self.planet_radius * MAX_RAY_DISTANCE_FACTOR
+
+    def update_sun_direction(self) -> None:
+        day_angle = (self.time_of_day_hours / 24.0) * (2.0 * np.pi)
+        seasonal_angle = self.time_of_year * (2.0 * np.pi)
+        tilt_rad = np.deg2rad(self.axial_tilt_degrees)
+        declination = tilt_rad * np.sin(seasonal_angle)
+
+        sun_dir = np.array(
+            [
+                np.cos(declination) * np.cos(day_angle),
+                np.sin(declination),
+                np.cos(declination) * np.sin(day_angle),
+            ],
+            dtype=np.float32,
+        )
+        norm = np.linalg.norm(sun_dir)
+        if norm > 0:
+            sun_dir /= norm
+        self.sun_direction = sun_dir
 
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(
@@ -137,10 +162,14 @@ class PlanetParameters:
             cloud_max_steps=self.cloud_max_steps,
             cloud_extinction=self.cloud_extinction,
             cloud_phase_exponent=self.cloud_phase_exponent,
+            axial_tilt_degrees=self.axial_tilt_degrees,
+            time_of_day_hours=self.time_of_day_hours,
+            time_of_year=self.time_of_year,
         )
 
 
 def default_planet_parameters() -> PlanetParameters:
     params = PlanetParameters()
     params.scale_with_planet_radius()
+    params.update_sun_direction()
     return params

@@ -28,9 +28,24 @@ def clamp_to_radius(camera, min_radius):
 def draw_parameter_panel(editing_params: PlanetParameters):
     imgui.begin("Planet Parameters")
 
-    changed, sun_dir = imgui.input_float3("Sun direction", *editing_params.sun_direction)
-    if changed:
-        editing_params.sun_direction = np.array(sun_dir, dtype=np.float32)
+    time_changed, editing_params.time_of_day_hours = imgui.slider_float(
+        "Time of day (hours)", editing_params.time_of_day_hours, 0.0, 24.0
+    )
+    year_changed, editing_params.time_of_year = imgui.slider_float(
+        "Time of year (0-1)", editing_params.time_of_year, 0.0, 1.0
+    )
+    tilt_changed, editing_params.axial_tilt_degrees = imgui.slider_float(
+        "Axial tilt (deg)", editing_params.axial_tilt_degrees, 0.0, 45.0
+    )
+    if time_changed or year_changed or tilt_changed:
+        editing_params.update_sun_direction()
+    imgui.text(
+        "Sun direction: {:.2f}, {:.2f}, {:.2f}".format(
+            editing_params.sun_direction[0],
+            editing_params.sun_direction[1],
+            editing_params.sun_direction[2],
+        )
+    )
 
     planet_changed, editing_params.planet_radius = imgui.input_float(
         "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0

@@ -83,6 +83,9 @@ class PlanetRenderer:
 
         glUseProgram(self.gbuffer_program)
         self._bind_common_uniforms(self.gbuffer_program, width, height)
+        set_int(self.gbuffer_program, "planetMaxSteps", self.parameters.planet_max_steps)
+        set_float(self.gbuffer_program, "planetStepScale", self.parameters.planet_step_scale)
+        set_float(self.gbuffer_program, "planetMinStepFactor", self.parameters.planet_min_step_factor)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
@@ -133,6 +136,9 @@ class PlanetRenderer:
 
         glUseProgram(self.cloud_program)
         self._bind_common_uniforms(self.cloud_program, width, height)
+        set_int(self.cloud_program, "cloudMaxSteps", self.parameters.cloud_max_steps)
+        set_float(self.cloud_program, "cloudExtinction", self.parameters.cloud_extinction)
+        set_float(self.cloud_program, "cloudPhaseExponent", self.parameters.cloud_phase_exponent)
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["position"])

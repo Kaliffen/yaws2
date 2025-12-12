@@ -18,6 +18,9 @@ uniform float atmosphereRadius;
 uniform float heightScale;
 uniform float maxRayDistance;
 uniform float seaLevel;
+uniform int planetMaxSteps;
+uniform float planetStepScale;
+uniform float planetMinStepFactor;
 uniform vec2 resolution;
 
 // Water Parameters
@@ -107,14 +110,15 @@ vec3 rayDirection(vec2 uv) {
 bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     t = 0.0;
     float eps = max(heightScale * 0.01, planetRadius * 0.0001);
-    for (int i = 0; i < 320; i++) {
+    for (int i = 0; i < 1024; i++) {
+        if (i >= planetMaxSteps) break;
         vec3 p = ro + rd * t;
         float d = planetSDF(p);
         if (d < eps) {
             pos = p;
             return true;
         }
-        t += max(d * 0.17, eps * 0.5);
+        t += max(d * planetStepScale, eps * planetMinStepFactor);
         if (t > maxRayDistance) break;
     }
     return false;

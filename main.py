@@ -37,9 +37,20 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     )
     if planet_changed:
         editing_params.scale_with_planet_radius()
-    _, editing_params.atmosphere_radius = imgui.input_float(
-        "Atmosphere radius (km)", editing_params.atmosphere_radius, step=10.0, step_fast=50.0
+    atmos_changed, editing_params.atmosphere_thickness_percent = imgui.slider_float(
+        "Atmosphere thickness (%)", editing_params.atmosphere_thickness_percent, 0.5, 20.0
     )
+    cloud_base_changed, editing_params.cloud_base_percent = imgui.slider_float(
+        "Cloud base (% of atmosphere)", editing_params.cloud_base_percent, 0.0, 100.0
+    )
+    cloud_thickness_changed, editing_params.cloud_layer_thickness_percent = imgui.slider_float(
+        "Cloud thickness (% of atmosphere)", editing_params.cloud_layer_thickness_percent, 0.0, 100.0
+    )
+    if atmos_changed or cloud_base_changed or cloud_thickness_changed:
+        editing_params.scale_with_planet_radius()
+    imgui.text(f"Atmosphere radius: {editing_params.atmosphere_radius:.2f} km")
+    imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude:.2f} km")
+    imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness:.2f} km")
     _, editing_params.height_scale = imgui.input_float(
         "Height scale (km)", editing_params.height_scale, step=10.0, step_fast=50.0
     )
@@ -59,13 +70,6 @@ def draw_parameter_panel(editing_params: PlanetParameters):
 
     _, editing_params.max_ray_distance = imgui.input_float(
         "Max ray distance", editing_params.max_ray_distance, step=50.0, step_fast=200.0
-    )
-
-    _, editing_params.cloud_base_altitude = imgui.input_float(
-        "Cloud base altitude", editing_params.cloud_base_altitude, step=0.5, step_fast=1.0
-    )
-    _, editing_params.cloud_layer_thickness = imgui.input_float(
-        "Cloud layer thickness", editing_params.cloud_layer_thickness, step=0.5, step_fast=1.0
     )
     _, editing_params.cloud_coverage = imgui.slider_float(
         "Cloud coverage", editing_params.cloud_coverage, 0.0, 1.0

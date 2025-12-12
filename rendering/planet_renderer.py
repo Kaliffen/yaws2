@@ -76,6 +76,7 @@ class PlanetRenderer:
         layer_visibility,
         target_fbo=0,
         quad_vao=None,
+        bind_quad=True,
     ):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
@@ -84,7 +85,7 @@ class PlanetRenderer:
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
 
-        if quad_vao is not None:
+        if bind_quad and quad_vao is not None:
             glBindVertexArray(int(quad_vao))
 
         # Pass 1: populate G-buffer (depth-tested)
@@ -200,5 +201,5 @@ class PlanetRenderer:
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
-        if quad_vao is not None:
+        if bind_quad and quad_vao is not None:
             glBindVertexArray(0)

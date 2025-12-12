@@ -186,6 +186,7 @@ class PlanetWidget(QOpenGLWidget):
                     self.layer_visibility,
                     self.defaultFramebufferObject(),
                     quad_vao=self.quad_vao,
+                    bind_quad=False,
                 )
         else:
             self.renderer.render(

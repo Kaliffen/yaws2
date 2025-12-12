@@ -3,7 +3,7 @@ import numpy as np
 
 
 # Default baseline values used to seed configurable parameters.
-SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
+SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 
 # Base scale values for the planet and atmosphere (kilometers)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct
@@ -54,8 +54,8 @@ _BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS
 
 CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
 CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
-CLOUD_COVERAGE = 0.62
-CLOUD_DENSITY = 0.85
+CLOUD_COVERAGE = 0.52
+CLOUD_DENSITY = 0.35
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
 
 # Raymarch controls

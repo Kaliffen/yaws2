@@ -156,6 +156,9 @@ def main():
     layer_visibility = [False] * 9
     pressed_state = [False] * 9
 
+    camera_mode = True
+    space_pressed = False
+
     last_mouse_x, last_mouse_y = width / 2, height / 2
     first_mouse = True
 
@@ -175,7 +178,19 @@ def main():
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
 
-        # Mouse look
+        # Toggle between camera and cursor interaction modes
+        space_down = glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS
+        if space_down and not space_pressed:
+            camera_mode = not camera_mode
+            glfw.set_input_mode(
+                window,
+                glfw.CURSOR,
+                glfw.CURSOR_DISABLED if camera_mode else glfw.CURSOR_NORMAL,
+            )
+            first_mouse = True
+        space_pressed = space_down
+
+        # Mouse look when in camera mode
         mx, my = glfw.get_cursor_pos(window)
         if first_mouse:
             last_mouse_x, last_mouse_y = mx, my
@@ -185,7 +200,7 @@ def main():
         yoff = last_mouse_y - my
         last_mouse_x, last_mouse_y = mx, my
 
-        if not io.want_capture_mouse:
+        if camera_mode and not io.want_capture_mouse:
             camera.process_mouse(xoff, yoff)
 
         # Keyboard

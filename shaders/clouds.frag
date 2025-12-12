@@ -13,6 +13,7 @@ uniform vec3 camForward;
 uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
+uniform float sunPower;
 uniform float planetRadius;
 uniform float cloudBaseAltitude;
 uniform float cloudLayerThickness;
@@ -184,10 +185,11 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
         float extinction = density * stepSize * cloudExtinction;
 
-        vec3 sunColor = computeSunTint(localNormal, lightDir);
+        float sunIntensity = max(sunPower, 0.0);
+        vec3 sunColor = computeSunTint(localNormal, lightDir) * sunIntensity;
         vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.35, 1.0, phase) * sunVisibility;
         vec3 ambient = mix(vec3(0.01, 0.015, 0.02), vec3(0.08, 0.10, 0.12), sunVisibility);
-        vec3 warmTwilight = vec3(0.16, 0.11, 0.10) * smoothstep(-0.12, 0.08, sunHeight) * (1.0 - lightAmount);
+        vec3 warmTwilight = vec3(0.16, 0.11, 0.10) * smoothstep(-0.12, 0.08, sunHeight) * (1.0 - lightAmount) * sunIntensity;
 
         vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize;
 

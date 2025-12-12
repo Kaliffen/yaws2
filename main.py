@@ -78,9 +78,15 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     imgui.set_next_window_size(right_panel_width, 0.0, condition=imgui.FIRST_USE_EVER)
     imgui.begin("Planet Parameters")
 
-    changed, sun_dir = imgui.input_float3("Sun direction", *editing_params.sun_direction)
+    changed, sun_dir = imgui.slider_float3("Sun direction", *editing_params.sun_direction, -1.0, 1.0)
     if changed:
-        editing_params.sun_direction = np.array(sun_dir, dtype=np.float32)
+        new_direction = np.array(sun_dir, dtype=np.float32)
+        length = np.linalg.norm(new_direction)
+        if length > 1e-5:
+            new_direction = new_direction / length
+        editing_params.sun_direction = new_direction
+
+    _, editing_params.sun_power = imgui.slider_float("Sun power", editing_params.sun_power, 0.0, 25.0)
 
     planet_changed, editing_params.planet_radius = imgui.input_float(
         "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0

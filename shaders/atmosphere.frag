@@ -12,6 +12,7 @@ uniform vec3 camForward;
 uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
+uniform float sunPower;
 uniform float planetRadius;
 uniform float atmosphereRadius;
 uniform float aspect;
@@ -104,7 +105,8 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     vec3 horizonTint = mix(sunTint, twilightTint, clamp(1.0 - sunVisibility, 0.0, 1.0));
     vec3 highAltTint = mix(vec3(0.08, 0.12, 0.18), vec3(0.18, 0.26, 0.36), horizonFactor);
     vec3 atmosphereColor = mix(highAltTint, horizonTint, clamp(0.28 + horizonFactor, 0.0, 1.0));
-    return atmosphereColor * scatter;
+    float sunIntensity = max(sunPower, 0.0);
+    return atmosphereColor * scatter * sunIntensity;
 }
 
 void main() {

@@ -4,6 +4,7 @@ import numpy as np
 
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
+SUN_POWER = 6.5
 
 # Base scale values for the planet and atmosphere (kilometers)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct
@@ -77,6 +78,7 @@ class PlanetParameters:
     """Container for all tweakable planet rendering parameters."""
 
     sun_direction: np.ndarray = field(default_factory=lambda: _copy_vector(SUN_DIRECTION))
+    sun_power: float = SUN_POWER
     planet_radius: float = PLANET_RADIUS
     atmosphere_thickness_percent: float = ATMOSPHERE_THICKNESS_PERCENT
     cloud_base_percent: float = CLOUD_BASE_PERCENT
@@ -142,6 +144,7 @@ class PlanetParameters:
             cloud_max_steps=self.cloud_max_steps,
             cloud_extinction=self.cloud_extinction,
             cloud_phase_exponent=self.cloud_phase_exponent,
+            sun_power=self.sun_power,
         )
 
 

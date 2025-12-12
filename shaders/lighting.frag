@@ -11,6 +11,9 @@ uniform sampler2D gMaterial;
 uniform vec3 camPos;
 uniform vec3 sunDir;
 uniform float seaLevel;
+uniform vec3 waterColor;
+uniform float waterAbsorption;
+uniform float waterScattering;
 
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
@@ -35,15 +38,34 @@ float computeShadow(vec3 pos, vec3 normal) {
     return clamp(ndl * 0.5 + 0.5, 0.0, 1.0) * horizon;
 }
 
-vec3 shadeWater(vec3 pos, vec3 normal, vec3 albedo, float depth) {
+vec3 shadeWater(vec3 pos, vec3 normal, vec3 floorColor, float depth) {
     vec3 lightDir = normalize(sunDir);
+    vec3 viewDir = normalize(camPos - pos);
+
     float ndl = max(dot(normal, lightDir), 0.0);
-    float fresnel = 0.04 + pow(1.0 - clamp(dot(normal, normalize(pos - camPos)), 0.0, 1.0), 5.0);
-    vec3 reflected = albedo * (0.4 + 0.6 * ndl);
-    float depthDarken = clamp(depth * 0.06, 0.0, 1.0);
-    vec3 transmitted = mix(albedo * 1.35, albedo, depthDarken) * exp(-depth * 0.12);
-    vec3 color = mix(transmitted, reflected, fresnel);
-    color += pow(max(dot(reflect(-lightDir, normal), normalize(pos - camPos)), 0.0), 48.0) * 0.25;
+    float viewFacing = max(dot(normal, viewDir), 0.0);
+    float entryCos = max(dot(normal, -viewDir), 0.05);
+
+    // Beer-Lambert attenuation scaled by incidence angle so grazing views
+    // travel through more water and darken appropriately.
+    float pathLength = depth / entryCos;
+    float absorption = exp(-waterAbsorption * pathLength * 0.35);
+
+    // Forward scattering brightens water that looks toward the sun.
+    float forward = pow(max(dot(viewDir, lightDir), 0.0), 4.0);
+    float scatterAmount = mix(0.12, 0.75, waterScattering);
+    vec3 inScattering = waterColor * (1.0 - absorption) * (0.35 + scatterAmount * (ndl * 0.6 + forward));
+
+    vec3 transmitted = floorColor * absorption;
+    vec3 reflected = waterColor * (0.35 + 0.65 * ndl);
+
+    float fresnel = 0.02 + pow(1.0 - viewFacing, 5.0);
+
+    vec3 color = mix(transmitted + inScattering, reflected, fresnel);
+
+    float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 48.0);
+    color += spec * mix(0.08, 0.35, scatterAmount);
+
     return color;
 }
 

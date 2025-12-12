@@ -214,7 +214,8 @@ void main() {
         vec3 waterSurfacePos = ro + rd * t0;
         pos = waterSurfacePos;
         normal = normalize(waterSurfacePos);
-        baseColor = mix(baseColor, waterColor, 0.6);
+        // Preserve the underlying terrain color so the lighting pass can
+        // treat the water as a transparent volume hovering above it.
         waterFlag = 1.0;
     } else if (!hit) {
         pos = ro + rd * maxRayDistance;

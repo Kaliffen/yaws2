@@ -11,6 +11,8 @@ uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
 uniform float aspect;
+uniform mat3 planetRotation;
+uniform mat3 planetRotationInv;
 
 // Planet Parameters
 uniform float planetRadius;
@@ -107,6 +109,14 @@ vec3 rayDirection(vec2 uv) {
     return normalize(camForward + uv.x * camRight + uv.y * camUp);
 }
 
+vec3 toPlanet(vec3 v) {
+    return planetRotationInv * v;
+}
+
+vec3 toWorld(vec3 v) {
+    return planetRotation * v;
+}
+
 bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     t = 0.0;
     float eps = max(heightScale * 0.01, planetRadius * 0.0001);
@@ -183,16 +193,17 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
 void main() {
     vec2 uv = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
 
-    vec3 ro = camPos;
-    vec3 rd = rayDirection(uv);
+    vec3 rdWorld = rayDirection(uv);
+    vec3 roLocal = toPlanet(camPos);
+    vec3 rdLocal = toPlanet(rdWorld);
 
     vec3 pos = vec3(0.0);
     float t;
-    bool hit = marchPlanet(ro, rd, pos, t);
+    bool hit = marchPlanet(roLocal, rdLocal, pos, t);
 
     float waterRadius = planetRadius + seaLevel;
     float t0, t1;
-    bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, t0, t1) && t1 > 0.0;
+    bool hitWaterSphere = intersectSphere(roLocal, rdLocal, waterRadius, t0, t1) && t1 > 0.0;
     if (hitWaterSphere && t0 < 0.0) t0 = 0.0;
 
     float tTerrain = hit ? t : 1e9;
@@ -200,24 +211,27 @@ void main() {
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
     float waterFlag = -1.0;
-    vec3 normal = normalize(rd);
+    vec3 normal = normalize(rdWorld);
 
     if (hit) {
         float d0 = planetSDF(pos);
-        normal = computeNormal(pos, d0);
-        baseColor = landColor(pos, normal, heightValue);
+        vec3 localNormal = computeNormal(pos, d0);
+        normal = normalize(toWorld(localNormal));
+        baseColor = landColor(pos, localNormal, heightValue);
         waterFlag = 0.0;
     }
 
     bool waterCoversTerrain = hitWaterSphere && (t0 < tTerrain) && heightValue <= seaLevel;
     if (waterCoversTerrain) {
-        vec3 waterSurfacePos = ro + rd * t0;
-        pos = waterSurfacePos;
-        normal = normalize(waterSurfacePos);
+        vec3 waterSurfaceLocal = roLocal + rdLocal * t0;
+        pos = toWorld(waterSurfaceLocal);
+        normal = normalize(toWorld(waterSurfaceLocal));
         baseColor = mix(baseColor, waterColor, 0.6);
         waterFlag = 1.0;
-    } else if (!hit) {
-        pos = ro + rd * maxRayDistance;
+    } else if (hit) {
+        pos = toWorld(pos);
+    } else {
+        pos = camPos + rdWorld * maxRayDistance;
     }
 
     float cloudMask = 0.0;
@@ -226,10 +240,10 @@ void main() {
     // atmosphere (or hits the surface). Otherwise distant space renders pick up
     // stray gray cloud patterns.
     float tAtm0, tAtm1;
-    bool throughAtmosphere = hit || (intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
+    bool throughAtmosphere = hit || (intersectSphere(roLocal, rdLocal, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
     if (throughAtmosphere) {
-        vec3 coverageSample = hit ? pos : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
-        cloudMask = cloudCoverageField(normalize(coverageSample));
+        vec3 coverageSample = hit ? pos : toWorld(roLocal + rdLocal * min(maxRayDistance, max(tAtm1, 0.0)));
+        cloudMask = cloudCoverageField(normalize(toPlanet(coverageSample)));
     }
 
     gPositionHeight = vec4(pos, heightValue);

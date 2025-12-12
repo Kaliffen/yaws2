@@ -95,6 +95,27 @@ def _rotate_vector(vector: np.ndarray, axis: np.ndarray, angle_rad: float) -> np
     return rotated.astype(np.float32)
 
 
+def _rotation_matrix(axis: np.ndarray, angle_rad: float) -> np.ndarray:
+    axis_norm = np.linalg.norm(axis)
+    if axis_norm == 0.0:
+        return np.identity(3, dtype=np.float32)
+
+    axis_unit = axis / axis_norm
+    x, y, z = axis_unit
+    cos_a = np.cos(angle_rad)
+    sin_a = np.sin(angle_rad)
+    one_minus_c = 1.0 - cos_a
+
+    return np.array(
+        [
+            [cos_a + x * x * one_minus_c, x * y * one_minus_c - z * sin_a, x * z * one_minus_c + y * sin_a],
+            [y * x * one_minus_c + z * sin_a, cos_a + y * y * one_minus_c, y * z * one_minus_c - x * sin_a],
+            [z * x * one_minus_c - y * sin_a, z * y * one_minus_c + x * sin_a, cos_a + z * z * one_minus_c],
+        ],
+        dtype=np.float32,
+    )
+
+
 @dataclass
 class PlanetParameters:
     """Container for all tweakable planet rendering parameters."""
@@ -126,6 +147,9 @@ class PlanetParameters:
     time_of_day_hours: float = TIME_OF_DAY_HOURS
     time_of_year: float = TIME_OF_YEAR
     rotation_speed_hours_per_sec: float = ROTATION_SPEED_HOURS_PER_SEC
+    spin_axis: np.ndarray = field(default_factory=lambda: np.array([0.0, 1.0, 0.0], dtype=np.float32))
+    planet_rotation_matrix: np.ndarray = field(default_factory=lambda: np.identity(3, dtype=np.float32))
+    planet_rotation_inv_matrix: np.ndarray = field(default_factory=lambda: np.identity(3, dtype=np.float32))
 
     def scale_with_planet_radius(self) -> None:
         atmosphere_thickness = self.planet_radius * (self.atmosphere_thickness_percent / 100.0)
@@ -139,29 +163,42 @@ class PlanetParameters:
         self.cloud_layer_thickness = atmosphere_thickness * cloud_thickness_ratio
         self.max_ray_distance = self.planet_radius * MAX_RAY_DISTANCE_FACTOR
 
-    def update_sun_direction(self) -> None:
-        day_angle = (self.time_of_day_hours / 24.0) * (2.0 * np.pi)
-        seasonal_angle = self.time_of_year * (2.0 * np.pi)
+    def update_spin_axis(self) -> None:
         tilt_rad = np.deg2rad(self.axial_tilt_degrees)
-
-        orbital_sun_dir = _rotate_vector(
-            np.array([0.0, 0.0, -1.0], dtype=np.float32),
-            np.array([0.0, 1.0, 0.0], dtype=np.float32),
-            seasonal_angle,
-        )
-
         tilted_axis = _rotate_vector(
             np.array([0.0, 1.0, 0.0], dtype=np.float32),
             np.array([1.0, 0.0, 0.0], dtype=np.float32),
             tilt_rad,
         )
+        norm = np.linalg.norm(tilted_axis)
+        if norm > 0:
+            tilted_axis /= norm
+        self.spin_axis = tilted_axis
 
-        sun_dir = _rotate_vector(orbital_sun_dir, tilted_axis, day_angle)
+    def update_sun_direction(self) -> None:
+        seasonal_angle = self.time_of_year * (2.0 * np.pi)
+
+        sun_dir = _rotate_vector(
+            np.array([0.0, 0.0, -1.0], dtype=np.float32),
+            np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            seasonal_angle,
+        )
 
         norm = np.linalg.norm(sun_dir)
         if norm > 0:
             sun_dir /= norm
         self.sun_direction = sun_dir
+
+    def update_planet_rotation(self) -> None:
+        day_angle = (self.time_of_day_hours / 24.0) * (2.0 * np.pi)
+        rotation = _rotation_matrix(self.spin_axis, -day_angle)
+        self.planet_rotation_matrix = rotation
+        self.planet_rotation_inv_matrix = rotation.T
+
+    def update_celestial_state(self) -> None:
+        self.update_spin_axis()
+        self.update_sun_direction()
+        self.update_planet_rotation()
 
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(
@@ -192,11 +229,14 @@ class PlanetParameters:
             time_of_day_hours=self.time_of_day_hours,
             time_of_year=self.time_of_year,
             rotation_speed_hours_per_sec=self.rotation_speed_hours_per_sec,
+            spin_axis=_copy_vector(self.spin_axis),
+            planet_rotation_matrix=np.array(self.planet_rotation_matrix, dtype=np.float32),
+            planet_rotation_inv_matrix=np.array(self.planet_rotation_inv_matrix, dtype=np.float32),
         )
 
 
 def default_planet_parameters() -> PlanetParameters:
     params = PlanetParameters()
     params.scale_with_planet_radius()
-    params.update_sun_direction()
+    params.update_celestial_state()
     return params

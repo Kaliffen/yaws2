@@ -44,7 +44,7 @@ def draw_parameter_panel(editing_params: PlanetParameters):
         2.0,
     )
     if time_changed or year_changed or tilt_changed:
-        editing_params.update_sun_direction()
+        editing_params.update_celestial_state()
     imgui.text(
         "Sun direction: {:.2f}, {:.2f}, {:.2f}".format(
             editing_params.sun_direction[0],
@@ -237,9 +237,10 @@ def main():
         if parameters.rotation_speed_hours_per_sec != 0.0:
             hours_advanced = parameters.rotation_speed_hours_per_sec * dt
             parameters.time_of_day_hours = (parameters.time_of_day_hours + hours_advanced) % 24.0
-            parameters.update_sun_direction()
+            parameters.update_planet_rotation()
             editing_params.time_of_day_hours = parameters.time_of_day_hours
-            editing_params.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
+            editing_params.planet_rotation_matrix = np.array(parameters.planet_rotation_matrix, dtype=np.float32)
+            editing_params.planet_rotation_inv_matrix = np.array(parameters.planet_rotation_inv_matrix, dtype=np.float32)
 
         io = imgui.get_io()
 

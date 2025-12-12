@@ -2,7 +2,7 @@ from OpenGL.GL import *
 
 from gl_utils.buffers import create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
-from rendering.uniforms import set_float, set_int, set_vec2, set_vec3
+from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
 
 
 class PlanetRenderer:
@@ -59,6 +59,8 @@ class PlanetRenderer:
         set_vec3(program, "cloudLightColor", self.parameters.cloud_light_color)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))
+        set_mat3(program, "planetRotation", self.parameters.planet_rotation_matrix)
+        set_mat3(program, "planetRotationInv", self.parameters.planet_rotation_inv_matrix)
 
         set_vec3(program, "waterColor", self.parameters.water_color)
         set_float(program, "waterAbsorption", self.parameters.water_absorption)

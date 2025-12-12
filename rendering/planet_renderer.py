@@ -26,6 +26,7 @@ class PlanetRenderer:
         self.seasonal_tilt_deg = 0.0
         self.planet_to_world = np.identity(3, dtype=np.float32)
         self.world_to_planet = np.identity(3, dtype=np.float32)
+        self.time_seconds = 0.0
 
     def _rotation_matrix_from_axis(self, axis: np.ndarray, angle_rad: float) -> np.ndarray:
         axis = axis / np.linalg.norm(axis)
@@ -90,9 +91,11 @@ class PlanetRenderer:
         set_float(program, "cloudLayerThickness", self.parameters.cloud_layer_thickness)
         set_float(program, "cloudCoverage", self.parameters.cloud_coverage)
         set_float(program, "cloudDensity", self.parameters.cloud_density)
+        set_float(program, "cloudAnimationSpeed", self.parameters.cloud_animation_speed)
         set_vec3(program, "cloudLightColor", self.parameters.cloud_light_color)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))
+        set_float(program, "timeSeconds", self.time_seconds)
 
         set_vec3(program, "waterColor", self.parameters.water_color)
         set_float(program, "waterAbsorption", self.parameters.water_absorption)
@@ -108,6 +111,7 @@ class PlanetRenderer:
         self.cam_forward = cam_front
         self.cam_right = cam_right
         self.cam_up = cam_up
+        self.time_seconds = calendar_state.elapsed_seconds
         self._update_rotation_matrices(calendar_state.day_fraction, calendar_state.year_fraction)
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)

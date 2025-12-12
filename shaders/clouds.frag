@@ -25,6 +25,9 @@ uniform float aspect;
 uniform int cloudMaxSteps;
 uniform float cloudExtinction;
 uniform float cloudPhaseExponent;
+uniform float cloudAnimationSpeed;
+uniform mat3 worldToPlanet;
+uniform float timeSeconds;
 
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
@@ -78,9 +81,24 @@ float fbm(vec3 p) {
     return v;
 }
 
+mat3 rotationY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(
+        c, 0.0, s,
+        0.0, 1.0, 0.0,
+        -s, 0.0, c
+    );
+}
+
 float cloudCoverageField(vec3 dir) {
-    float bands = fbm(dir * 3.1 + vec3(1.7, -2.2, 0.5));
-    float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    float swirlAngle = cloudTime * 0.012;
+    vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
+    vec3 spunDir = rotationY(swirlAngle) * dir;
+
+    float bands = fbm(spunDir * 3.1 + vec3(1.7, -2.2, 0.5) + flowOffset);
+    float streaks = fbm(spunDir * 7.2 + vec3(-4.1, 2.6, 3.3) - flowOffset);
     float coverage = bands * 0.65 + streaks * 0.45;
     coverage = coverage * cloudCoverage + 0.12;
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
@@ -88,9 +106,14 @@ float cloudCoverageField(vec3 dir) {
 
 float cloudShapeNoise(vec3 p) {
     vec3 normalizedP = p / planetRadius;
-    float base = fbm(normalizedP * 22.0 + vec3(8.2, 1.7, -3.4));
-    float detail = fbm(normalizedP * 64.0 - vec3(4.1, 5.6, 2.0));
-    float billow = abs(fbm(normalizedP * 12.0 + vec3(-6.0, 2.5, 4.3)) * 2.0 - 1.0);
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    float swirlAngle = cloudTime * 0.02;
+    vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
+    vec3 warped = rotationY(swirlAngle) * normalizedP + flowOffset;
+
+    float base = fbm(warped * 22.0 + vec3(8.2, 1.7, -3.4));
+    float detail = fbm(warped * 64.0 - vec3(4.1, 5.6, 2.0));
+    float billow = abs(fbm(warped * 12.0 + vec3(-6.0, 2.5, 4.3)) * 2.0 - 1.0);
     return base * 0.55 + detail * 0.3 + billow * 0.15;
 }
 
@@ -156,7 +179,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
     float stepSize = (end - start) / max(float(cloudMaxSteps), 1.0);
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
-    vec3 lightDir = normalize(sunDir);
+    vec3 lightDir = normalize(worldToPlanet * sunDir);
 
     for (int i = 0; i < 256; i++) {
         if (i >= cloudMaxSteps) break;
@@ -212,9 +235,11 @@ void main() {
     vec4 material = texture(gMaterial, uv);
     bool hit = normalFlags.w > -0.5;
 
-    vec3 viewDir = hit ? normalize(pos - camPos) : rayDirection(uv);
+    vec3 camPlanet = worldToPlanet * camPos;
+    vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
+    vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
     float surfaceDistance = hit ? length(pos - camPos) : maxRayDistance;
-    vec4 clouds = raymarchClouds(camPos, viewDir, surfaceDistance, material.a);
+    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a);
 
     FragColor = clouds;
 }

@@ -16,6 +16,7 @@ uniform float sunPower;
 uniform float planetRadius;
 uniform float atmosphereRadius;
 uniform float aspect;
+uniform mat3 worldToPlanet;
 
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
@@ -85,7 +86,7 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float altitudeNorm = clamp(viewHeight / atmThickness, 0.0, 1.0);
     float altitudeFalloff = mix(1.0, 0.25, altitudeNorm * altitudeNorm);
 
-    vec3 lightDir = normalize(sunDir);
+    vec3 lightDir = normalize(worldToPlanet * sunDir);
     float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
     float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
 
@@ -116,8 +117,11 @@ void main() {
     vec4 normalFlags = decodeNormalFlags(uv);
     bool hit = normalFlags.w > -0.5;
 
-    vec3 viewDir = hit ? normalize(pos - camPos) : rayDirection(uv);
-    vec3 atmosphere = computeAtmosphere(camPos, viewDir, pos, hit);
+    vec3 camPlanet = worldToPlanet * camPos;
+    vec3 posPlanet = worldToPlanet * pos;
+    vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
+    vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
+    vec3 atmosphere = computeAtmosphere(camPlanet, viewDirPlanet, posPlanet, hit);
 
     float opticalDepth = length(atmosphere);
     float transmittance = exp(-opticalDepth * 0.55);

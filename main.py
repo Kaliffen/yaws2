@@ -132,6 +132,9 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     _, editing_params.cloud_density = imgui.slider_float(
         "Cloud density", editing_params.cloud_density, 0.0, 1.0
     )
+    _, editing_params.cloud_animation_speed = imgui.slider_float(
+        "Cloud animation speed", editing_params.cloud_animation_speed, 0.0, 0.2
+    )
     changed, cloud_light = imgui.input_float3("Cloud light color", *editing_params.cloud_light_color)
     if changed:
         editing_params.cloud_light_color = np.array(cloud_light, dtype=np.float32)

@@ -51,8 +51,8 @@ bool intersectSphere(vec3 ro, vec3 rd, float radius, out float t0, out float t1)
 vec3 computeSunTint(vec3 position, vec3 lightDir) {
     float sunHeight = clamp(dot(normalize(position), lightDir), -1.0, 1.0);
 
-    float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
-    float horizonBand = smoothstep(0.02, 0.18, 1.0 - abs(sunHeight)) * smoothstep(-0.05, 0.18, sunHeight);
+    float dayFactor = smoothstep(-0.008, 0.06, sunHeight);
+    float horizonBand = smoothstep(0.0, 0.035, 1.0 - abs(sunHeight)) * smoothstep(-0.012, 0.055, sunHeight);
 
     vec3 nightColor = vec3(0.04, 0.07, 0.12);
     vec3 dayColor = vec3(0.94, 0.95, 0.93);
@@ -61,7 +61,7 @@ vec3 computeSunTint(vec3 position, vec3 lightDir) {
 
     vec3 warmBlend = mix(dayColor, goldenColor, horizonBand);
     vec3 base = mix(nightColor, warmBlend, dayFactor);
-    return mix(base, twilightColor, horizonBand * 0.55);
+    return mix(base, twilightColor, horizonBand * 0.3);
 }
 
 float computeShadow(vec3 pos, vec3 normal) {
@@ -132,15 +132,15 @@ void main() {
     float rawNdl = dot(normal, lightDir);
     float ndl = max(rawNdl, 0.0);
     float wrapNdl = clamp((rawNdl + 0.65) / 1.65, 0.0, 1.0);
-    float horizonBlend = smoothstep(-0.35, 0.45, rawNdl);
-    float softHalo = smoothstep(-0.68, -0.08, rawNdl) * (1.0 - horizonBlend);
+    float horizonBlend = smoothstep(-0.18, 0.25, rawNdl);
+    float softHalo = smoothstep(-0.4, -0.05, rawNdl) * (1.0 - horizonBlend);
     float sunHeight = dot(normalize(pos), lightDir);
 
     float sunIntensity = max(sunPower, 0.0);
     vec3 sunColor = computeSunTint(pos, lightDir) * sunIntensity;
-    float sunVisibility = smoothstep(-0.08, 0.05, sunHeight);
+    float sunVisibility = smoothstep(-0.012, 0.032, sunHeight);
     vec3 effectiveSunColor = sunColor * sunVisibility;
-    float twilight = smoothstep(-0.45, 0.05, sunHeight);
+    float twilight = smoothstep(-0.12, 0.025, sunHeight);
     vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
     float ambientStrength = mix(0.02, 0.14, twilight);
 

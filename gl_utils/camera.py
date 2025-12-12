@@ -1,8 +1,29 @@
-﻿import numpy as np
+import numpy as np
+
+WORLD_UP = np.array([0.0, 1.0, 0.0], dtype=np.float32)
 
 
 def normalize(v):
-    return v / np.linalg.norm(v)
+    norm = np.linalg.norm(v)
+    if norm < 1e-8:
+        return np.array(v, dtype=np.float32)
+    return (v / norm).astype(np.float32)
+
+
+def _rotation_matrix(axis: np.ndarray, angle_rad: float) -> np.ndarray:
+    axis = normalize(axis)
+    c = np.cos(angle_rad)
+    s = np.sin(angle_rad)
+    t = 1.0 - c
+    x, y, z = axis
+    return np.array(
+        [
+            [t * x * x + c, t * x * y - s * z, t * x * z + s * y],
+            [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
+            [t * x * z - s * y, t * y * z + s * x, t * z * z + c],
+        ],
+        dtype=np.float32,
+    )
 
 
 class FPSCamera:
@@ -10,13 +31,18 @@ class FPSCamera:
         self.position = position.astype(np.float32)
         self.yaw = yaw
         self.pitch = pitch
-        self.front = np.array([0, 0, -1], dtype=np.float32)
-        self.right = np.array([1, 0, 0], dtype=np.float32)
-        self.up = np.array([0, 1, 0], dtype=np.float32)
+        self.front = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        self.right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        self.up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
         self.speed = 5.0
         self.sensitivity = 0.1
         self.min_radius = None
+        self.reference_up = WORLD_UP.copy()
+        self.velocity = np.zeros(3, dtype=np.float32)
         self.update_vectors()
+
+    def set_reference_up(self, up_vector: np.ndarray):
+        self.reference_up = normalize(up_vector)
 
     def update_vectors(self):
         yaw_r = np.radians(self.yaw)
@@ -26,9 +52,32 @@ class FPSCamera:
         fy = np.sin(pitch_r)
         fz = np.sin(yaw_r) * np.cos(pitch_r)
 
-        self.front = normalize(np.array([fx, fy, fz], dtype=np.float32))
-        self.right = normalize(np.cross(self.front, np.array([0, 1, 0], dtype=np.float32)))
-        self.up = normalize(np.cross(self.right, self.front))
+        base_front = normalize(np.array([fx, fy, fz], dtype=np.float32))
+        base_right = normalize(np.cross(base_front, WORLD_UP))
+        base_up = normalize(np.cross(base_right, base_front))
+
+        target_up = normalize(self.reference_up)
+        alignment_axis = np.cross(WORLD_UP, target_up)
+        alignment_axis_norm = np.linalg.norm(alignment_axis)
+        dot_up = float(np.clip(np.dot(WORLD_UP, target_up), -1.0, 1.0))
+
+        if alignment_axis_norm < 1e-6:
+            if dot_up < 0.0:
+                alignment_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+                angle = np.pi
+            else:
+                self.front = base_front
+                self.right = base_right
+                self.up = base_up
+                return
+        else:
+            alignment_axis = alignment_axis / alignment_axis_norm
+            angle = np.arccos(dot_up)
+
+        rotation = _rotation_matrix(alignment_axis, angle)
+        self.front = normalize(rotation @ base_front)
+        self.right = normalize(rotation @ base_right)
+        self.up = normalize(rotation @ base_up)
 
     def process_mouse(self, xoff, yoff):
         xoff *= self.sensitivity

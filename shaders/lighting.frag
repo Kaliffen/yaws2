@@ -62,7 +62,7 @@ void main() {
     vec3 lightDir = normalize(sunDir);
     float ndl = max(dot(normal, lightDir), 0.0);
     float horizonBlend = smoothstep(0.0, 0.22, ndl);
-    float ambient = 0.08;
+    float ambient = 0.01;
     float lighting = hit ? clamp(ambient + ndl * horizonBlend, 0.0, 1.0) : 0.0;
 
     float shadow = hit ? computeShadow(pos, normal) : 0.0;

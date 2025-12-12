@@ -32,9 +32,11 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     if changed:
         editing_params.sun_direction = np.array(sun_dir, dtype=np.float32)
 
-    _, editing_params.planet_radius = imgui.input_float(
+    planet_changed, editing_params.planet_radius = imgui.input_float(
         "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0
     )
+    if planet_changed:
+        editing_params.scale_with_planet_radius()
     _, editing_params.atmosphere_radius = imgui.input_float(
         "Atmosphere radius (km)", editing_params.atmosphere_radius, step=10.0, step_fast=50.0
     )

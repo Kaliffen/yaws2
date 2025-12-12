@@ -10,8 +10,16 @@ SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
 # when flying close to the surface.
 PLANET_RADIUS = 6371.0
 
-# Keep a thin atmospheric shell around the surface (~110 km thick).
-ATMOSPHERE_RADIUS = PLANET_RADIUS + 210.0
+# Express atmospheric and cloud heights as ratios so they automatically scale
+# with the planet radius. A 10% shell keeps the atmosphere visually deep
+# enough when zooming out, while the base and thickness fractions preserve the
+# original relative cloud placement.
+ATMOSPHERE_THICKNESS_RATIO = 0.10
+_BASELINE_ATMOSPHERE_THICKNESS = 210.0
+CLOUD_BASE_ALTITUDE_RATIO = 6.5 / _BASELINE_ATMOSPHERE_THICKNESS
+CLOUD_LAYER_THICKNESS_RATIO = 8.0 / _BASELINE_ATMOSPHERE_THICKNESS
+
+ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
 # exaggerated features, but still allow visible mountain ranges.
@@ -31,13 +39,18 @@ WATER_SCATTERING = 0.14
 # Raymarch distances scale with the planet to ensure intersections are found
 # reliably without overshooting. A longer distance avoids missing the planet
 # when pulling far back for full-globe views.
-MAX_RAY_DISTANCE = PLANET_RADIUS * 3.0
+MAX_RAY_DISTANCE_FACTOR = 3.0
+MAX_RAY_DISTANCE = PLANET_RADIUS * MAX_RAY_DISTANCE_FACTOR
 
 # Cloud parameters keep volumetric sampling anchored to the planet instead of the
 # screen. A shallow layer near the surface produces convincing low-altitude
 # clouds without spilling deep into the atmosphere.
-CLOUD_BASE_ALTITUDE = 6.5
-CLOUD_LAYER_THICKNESS = 8.0
+_BASELINE_ATMOSPHERE_THICKNESS_RATIO = _BASELINE_ATMOSPHERE_THICKNESS / PLANET_RADIUS
+_BASELINE_CLOUD_BASE_ALTITUDE = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS_RATIO * CLOUD_BASE_ALTITUDE_RATIO
+_BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS_RATIO * CLOUD_LAYER_THICKNESS_RATIO
+
+CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
+CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
 CLOUD_COVERAGE = 0.62
 CLOUD_DENSITY = 0.85
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
@@ -81,6 +94,13 @@ class PlanetParameters:
     cloud_extinction: float = CLOUD_EXTINCTION
     cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
 
+    def scale_with_planet_radius(self) -> None:
+        atmosphere_thickness = self.planet_radius * ATMOSPHERE_THICKNESS_RATIO
+        self.atmosphere_radius = self.planet_radius + atmosphere_thickness
+        self.cloud_base_altitude = atmosphere_thickness * CLOUD_BASE_ALTITUDE_RATIO
+        self.cloud_layer_thickness = atmosphere_thickness * CLOUD_LAYER_THICKNESS_RATIO
+        self.max_ray_distance = self.planet_radius * MAX_RAY_DISTANCE_FACTOR
+
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(
             sun_direction=_copy_vector(self.sun_direction),
@@ -107,4 +127,6 @@ class PlanetParameters:
 
 
 def default_planet_parameters() -> PlanetParameters:
-    return PlanetParameters()
+    params = PlanetParameters()
+    params.scale_with_planet_radius()
+    return params

@@ -23,6 +23,7 @@ class PlanetRenderer:
         self.cam_right = None
         self.cam_up = None
         self.spin_angle_deg = 0.0
+        self.seasonal_tilt_deg = 0.0
         self.planet_to_world = np.identity(3, dtype=np.float32)
         self.world_to_planet = np.identity(3, dtype=np.float32)
 
@@ -41,9 +42,10 @@ class PlanetRenderer:
             dtype=np.float32,
         )
 
-    def _update_rotation_matrices(self, dt: float) -> None:
-        self.spin_angle_deg = (self.spin_angle_deg + self.parameters.spin_speed_deg_per_s * dt) % 360.0
-        tilt_rad = np.deg2rad(self.parameters.tilt_degrees)
+    def _update_rotation_matrices(self, day_fraction: float, year_fraction: float) -> None:
+        self.spin_angle_deg = (day_fraction * 360.0) % 360.0
+        self.seasonal_tilt_deg = self.parameters.tilt_degrees * np.cos(2.0 * np.pi * year_fraction)
+        tilt_rad = np.deg2rad(self.seasonal_tilt_deg)
         tilt_matrix = np.array(
             [[1.0, 0.0, 0.0], [0.0, np.cos(tilt_rad), -np.sin(tilt_rad)], [0.0, np.sin(tilt_rad), np.cos(tilt_rad)]],
             dtype=np.float32,
@@ -101,12 +103,12 @@ class PlanetRenderer:
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
 
-    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, dt):
+    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, calendar_state):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
         self.cam_up = cam_up
-        self._update_rotation_matrices(dt)
+        self._update_rotation_matrices(calendar_state.day_fraction, calendar_state.year_fraction)
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
 

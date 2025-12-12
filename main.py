@@ -9,7 +9,7 @@ from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera
 from rendering.constants import PlanetParameters, default_planet_parameters
 from rendering.planet_renderer import PlanetRenderer
-from utils.time import DeltaTimer
+from utils.time import DeltaTimer, PlanetCalendar
 
 
 def compute_adaptive_speed(position, base_speed, planet_radius):
@@ -89,9 +89,6 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     _, editing_params.sun_power = imgui.slider_float("Sun power", editing_params.sun_power, 0.0, 25.0)
 
     _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
-    _, editing_params.spin_speed_deg_per_s = imgui.input_float(
-        "Spin speed (deg/s)", editing_params.spin_speed_deg_per_s, step=0.1, step_fast=1.0
-    )
 
     planet_changed, editing_params.planet_radius = imgui.input_float(
         "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0
@@ -152,7 +149,7 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     return update_clicked, reset_clicked
 
 
-def draw_performance_panel(editing_params: PlanetParameters):
+def draw_performance_panel(editing_params: PlanetParameters, calendar_state, days_in_year: int):
     io = imgui.get_io()
     left_panel_width = max(io.display_size.x * 0.28, 340.0)
     imgui.set_next_window_position(12.0, 12.0, condition=imgui.FIRST_USE_EVER)
@@ -169,6 +166,17 @@ def draw_performance_panel(editing_params: PlanetParameters):
     if imgui.button("High", width=90):
         apply_raymarch_preset(editing_params, "High")
 
+    imgui.separator()
+
+    imgui.text("Calendar")
+    imgui.text(f"Day {calendar_state.day_index + 1} / {days_in_year}")
+    imgui.text(
+        f"Time {calendar_state.hour:02d}:{calendar_state.minute:02d}:{calendar_state.second:02d}"
+    )
+    _, editing_params.time_speed = imgui.input_float(
+        "Time speed (x realtime)", editing_params.time_speed, step=0.5, step_fast=5.0
+    )
+    editing_params.time_speed = max(editing_params.time_speed, 0.0)
     imgui.separator()
 
     imgui.text("Ray distances")
@@ -277,6 +285,7 @@ def main():
         parameters,
     )
     timer = DeltaTimer()
+    calendar = PlanetCalendar()
 
     debug_level = 9
     pressed_state = [False] * 9
@@ -294,6 +303,7 @@ def main():
 
     while not glfw.window_should_close(window):
         dt = timer.get_delta()
+        calendar_state = calendar.advance(dt, editing_params.time_speed)
         glfw.poll_events()
         imgui_renderer.process_inputs()
         imgui.new_frame()
@@ -362,7 +372,7 @@ def main():
         framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
         width, height = framebuffer_width or width, framebuffer_height or height
 
-        draw_performance_panel(editing_params)
+        draw_performance_panel(editing_params, calendar_state, calendar.days_in_year)
         update_clicked, reset_clicked = draw_parameter_panel(editing_params)
 
         if update_clicked:
@@ -387,7 +397,7 @@ def main():
             width,
             height,
             debug_level,
-            dt,
+            calendar_state,
         )
 
         imgui.render()

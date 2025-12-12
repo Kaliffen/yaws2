@@ -173,7 +173,7 @@ class PlanetParameters:
         norm = np.linalg.norm(tilted_axis)
         if norm > 0:
             tilted_axis /= norm
-        self.spin_axis = tilted_axis
+        self.spin_axis = tilted_axis.astype(np.float32)
 
     def update_sun_direction(self) -> None:
         seasonal_angle = self.time_of_year * (2.0 * np.pi)
@@ -191,7 +191,10 @@ class PlanetParameters:
 
     def update_planet_rotation(self) -> None:
         day_angle = (self.time_of_day_hours / 24.0) * (2.0 * np.pi)
-        rotation = _rotation_matrix(self.spin_axis, -day_angle)
+        axis = self.spin_axis
+        if np.linalg.norm(axis) == 0.0:
+            axis = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        rotation = _rotation_matrix(axis, -day_angle)
         self.planet_rotation_matrix = rotation
         self.planet_rotation_inv_matrix = rotation.T
 

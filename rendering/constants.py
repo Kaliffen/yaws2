@@ -14,11 +14,11 @@ PLANET_RADIUS = 6371.0
 # or atmosphere thickness so they automatically scale. A thinner 3% shell keeps
 # the atmosphere more believable while still visible at a distance, and the
 # cloud band lives comfortably within that shell.
-ATMOSPHERE_THICKNESS_PERCENT = 3.0
+ATMOSPHERE_THICKNESS_PERCENT = 6.0
 ATMOSPHERE_THICKNESS_RATIO = ATMOSPHERE_THICKNESS_PERCENT / 100.0
 _BASELINE_ATMOSPHERE_THICKNESS = PLANET_RADIUS * ATMOSPHERE_THICKNESS_RATIO
-CLOUD_BASE_PERCENT = 35.0
-CLOUD_LAYER_THICKNESS_PERCENT = 25.0
+CLOUD_BASE_PERCENT = 65.0
+CLOUD_LAYER_THICKNESS_PERCENT = 35.0
 CLOUD_BASE_ALTITUDE_RATIO = CLOUD_BASE_PERCENT / 100.0
 CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 
@@ -32,12 +32,12 @@ HEIGHT_SCALE = 532.2
 # Interpret sea level as a world-space height offset instead of a fractional
 # multiplier so the shader math stays consistent. A small positive offset keeps
 # shallow coastlines without burying continents.
-SEA_LEVEL = -35.0  # kilometers above the planet radius
+SEA_LEVEL = 0.0  # kilometers above the planet radius
 # Slightly brighter water with a touch more scattering makes oceans stand out
 # against land.
-WATER_COLOR = np.array([0.02, 0.16, 0.34], dtype=np.float32)
+WATER_COLOR = np.array([0.02, 0.16, 0.24], dtype=np.float32)
 WATER_ABSORPTION = 0.24
-WATER_SCATTERING = 0.14
+WATER_SCATTERING = 0.24
 
 # Raymarch distances scale with the planet to ensure intersections are found
 # reliably without overshooting. A longer distance avoids missing the planet

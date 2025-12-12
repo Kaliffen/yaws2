@@ -58,17 +58,18 @@ vec2 rayAtmosphereSegment(vec3 rayOrigin, vec3 rayDir, float hitDistance) {
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
 
-    // Transition smoothly from a cool night hue to a warmer daylight tint,
-    // with a pronounced golden boost near the horizon.
-    float dayFactor = smoothstep(-0.22, 0.1, sunHeight);
-    float horizonWarmth = smoothstep(0.0, 0.35, 1.0 - abs(sunHeight)) * dayFactor;
+    // Transition from a cool night hue to a tighter, warmer daylight band.
+    float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
+    float horizonBand = smoothstep(0.02, 0.18, 1.0 - abs(sunHeight)) * smoothstep(-0.05, 0.18, sunHeight);
 
-    vec3 nightColor = vec3(0.03, 0.07, 0.12);
-    vec3 dayColor = vec3(0.28, 0.52, 0.74);
-    vec3 goldenColor = vec3(1.1, 0.65, 0.38);
+    vec3 nightColor = vec3(0.02, 0.06, 0.12);
+    vec3 dayColor = vec3(0.26, 0.48, 0.70);
+    vec3 goldenColor = vec3(0.98, 0.62, 0.36);
+    vec3 twilightColor = vec3(0.30, 0.24, 0.46);
 
-    vec3 warmBlend = mix(dayColor, goldenColor, horizonWarmth);
-    return mix(nightColor, warmBlend, dayFactor);
+    vec3 warmBlend = mix(dayColor, goldenColor, horizonBand);
+    vec3 base = mix(nightColor, warmBlend, dayFactor);
+    return mix(base, twilightColor, horizonBand * 0.6);
 }
 
 vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface) {
@@ -94,12 +95,15 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
     float density = (0.28 + 0.55 * (1.0 - altitudeNorm)) * pathFactor;
 
-    float scatter = horizonFactor * altitudeFalloff * density * sunVisibility * 0.82;
-    scatter += mieForward * 0.08;
+    float scatter = horizonFactor * altitudeFalloff * density * sunVisibility * 0.72;
+    scatter += mieForward * 0.06;
 
     vec3 sunTint = computeSunTint(normalize(rayOrigin), lightDir);
-    vec3 horizonTint = mix(sunTint, vec3(0.22, 0.3, 0.45), clamp(1.0 - sunVisibility, 0.0, 1.0));
-    vec3 atmosphereColor = mix(vec3(0.08, 0.12, 0.18), horizonTint, clamp(0.2 + horizonFactor, 0.0, 1.0));
+    float twilightBlend = smoothstep(-0.32, 0.06, sunFacing) * (1.0 - sunVisibility);
+    vec3 twilightTint = mix(vec3(0.16, 0.18, 0.30), vec3(0.30, 0.24, 0.46), twilightBlend);
+    vec3 horizonTint = mix(sunTint, twilightTint, clamp(1.0 - sunVisibility, 0.0, 1.0));
+    vec3 highAltTint = mix(vec3(0.08, 0.12, 0.18), vec3(0.18, 0.26, 0.36), horizonFactor);
+    vec3 atmosphereColor = mix(highAltTint, horizonTint, clamp(0.28 + horizonFactor, 0.0, 1.0));
     return atmosphereColor * scatter;
 }
 

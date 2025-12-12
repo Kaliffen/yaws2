@@ -41,7 +41,7 @@ class PlanetRenderer:
         self.atmosphere_buffer = create_color_fbo(width, height)
         self.cloud_buffer = create_color_fbo(width, height)
 
-    def _bind_common_uniforms(self, program, width, height):
+    def _bind_common_uniforms(self, program, width, height, planet_rotation_angle):
         set_vec3(program, "camPos", self.cam_pos)
         set_vec3(program, "camForward", self.cam_forward)
         set_vec3(program, "camRight", self.cam_right)
@@ -59,6 +59,7 @@ class PlanetRenderer:
         set_vec3(program, "cloudLightColor", self.parameters.cloud_light_color)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))
+        set_float(program, "planetRotationAngle", planet_rotation_angle)
 
         set_vec3(program, "waterColor", self.parameters.water_color)
         set_float(program, "waterAbsorption", self.parameters.water_absorption)
@@ -67,7 +68,7 @@ class PlanetRenderer:
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
 
-    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, layer_visibility):
+    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, layer_visibility, planet_rotation_angle):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
@@ -82,7 +83,7 @@ class PlanetRenderer:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         glUseProgram(self.gbuffer_program)
-        self._bind_common_uniforms(self.gbuffer_program, width, height)
+        self._bind_common_uniforms(self.gbuffer_program, width, height, planet_rotation_angle)
         set_int(self.gbuffer_program, "planetMaxSteps", self.parameters.planet_max_steps)
         set_float(self.gbuffer_program, "planetStepScale", self.parameters.planet_step_scale)
         set_float(self.gbuffer_program, "planetMinStepFactor", self.parameters.planet_min_step_factor)
@@ -95,7 +96,7 @@ class PlanetRenderer:
         glClear(GL_COLOR_BUFFER_BIT)
 
         glUseProgram(self.lighting_program)
-        self._bind_common_uniforms(self.lighting_program, width, height)
+        self._bind_common_uniforms(self.lighting_program, width, height, planet_rotation_angle)
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["position"])
@@ -117,7 +118,7 @@ class PlanetRenderer:
         glClear(GL_COLOR_BUFFER_BIT)
 
         glUseProgram(self.atmosphere_program)
-        self._bind_common_uniforms(self.atmosphere_program, width, height)
+        self._bind_common_uniforms(self.atmosphere_program, width, height, planet_rotation_angle)
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["position"])
@@ -135,7 +136,7 @@ class PlanetRenderer:
         glClear(GL_COLOR_BUFFER_BIT)
 
         glUseProgram(self.cloud_program)
-        self._bind_common_uniforms(self.cloud_program, width, height)
+        self._bind_common_uniforms(self.cloud_program, width, height, planet_rotation_angle)
         set_int(self.cloud_program, "cloudMaxSteps", self.parameters.cloud_max_steps)
         set_float(self.cloud_program, "cloudExtinction", self.parameters.cloud_extinction)
         set_float(self.cloud_program, "cloudPhaseExponent", self.parameters.cloud_phase_exponent)
@@ -160,7 +161,7 @@ class PlanetRenderer:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         glUseProgram(self.composite_program)
-        self._bind_common_uniforms(self.composite_program, width, height)
+        self._bind_common_uniforms(self.composite_program, width, height, planet_rotation_angle)
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["position"])

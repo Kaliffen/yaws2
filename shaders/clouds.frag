@@ -24,6 +24,7 @@ uniform float aspect;
 uniform int cloudMaxSteps;
 uniform float cloudExtinction;
 uniform float cloudPhaseExponent;
+uniform float planetRotationAngle;
 
 float hash(vec3 p) {
     p = fract(p * 0.3183099 + vec3(0.1));
@@ -69,6 +70,16 @@ float cloudCoverageField(vec3 dir) {
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
 }
 
+mat3 rotationY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(
+        c, 0.0, s,
+        0.0, 1.0, 0.0,
+        -s, 0.0, c
+    );
+}
+
 float cloudShapeNoise(vec3 p) {
     vec3 normalizedP = p / planetRadius;
     float base = fbm(normalizedP * 22.0 + vec3(8.2, 1.7, -3.4));
@@ -110,7 +121,7 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
     return true;
 }
 
-vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float coverageHint) {
+vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float coverageHint, vec3 sunDirection) {
     float baseRadius = planetRadius + cloudBaseAltitude;
     float topRadius = baseRadius + cloudLayerThickness;
 
@@ -139,7 +150,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
     float stepSize = (end - start) / max(float(cloudMaxSteps), 1.0);
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
-    vec3 lightDir = normalize(sunDir);
+    vec3 lightDir = normalize(sunDirection);
 
     for (int i = 0; i < 256; i++) {
         if (i >= cloudMaxSteps) break;
@@ -176,9 +187,14 @@ void main() {
     vec4 material = texture(gMaterial, uv);
     bool hit = normalFlags.w > -0.5;
 
-    vec3 viewDir = hit ? normalize(pos - camPos) : rayDirection(uv);
+    mat3 planetInvRotation = transpose(rotationY(planetRotationAngle));
+
+    vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
+    vec3 rayOrigin = planetInvRotation * camPos;
+    vec3 rayDir = planetInvRotation * viewDirWorld;
     float surfaceDistance = hit ? length(pos - camPos) : maxRayDistance;
-    vec4 clouds = raymarchClouds(camPos, viewDir, surfaceDistance, material.a);
+    vec3 rotatedSunDir = planetInvRotation * sunDir;
+    vec4 clouds = raymarchClouds(rayOrigin, rayDir, surfaceDistance, material.a, rotatedSunDir);
 
     FragColor = clouds;
 }

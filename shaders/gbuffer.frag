@@ -22,6 +22,7 @@ uniform int planetMaxSteps;
 uniform float planetStepScale;
 uniform float planetMinStepFactor;
 uniform vec2 resolution;
+uniform float planetRotationAngle;
 
 // Water Parameters
 uniform vec3 waterColor;
@@ -70,6 +71,16 @@ float cloudCoverageField(vec3 dir) {
     float coverage = bands * 0.65 + streaks * 0.45;
     coverage = coverage * cloudCoverage + 0.12;
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
+}
+
+mat3 rotationY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(
+        c, 0.0, s,
+        0.0, 1.0, 0.0,
+        -s, 0.0, c
+    );
 }
 
 // Terrain Height and SDF
@@ -183,8 +194,14 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
 void main() {
     vec2 uv = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
 
-    vec3 ro = camPos;
-    vec3 rd = rayDirection(uv);
+    mat3 planetRotation = rotationY(planetRotationAngle);
+    mat3 planetInvRotation = transpose(planetRotation);
+
+    vec3 worldRo = camPos;
+    vec3 worldRd = rayDirection(uv);
+
+    vec3 ro = planetInvRotation * worldRo;
+    vec3 rd = planetInvRotation * worldRd;
 
     vec3 pos = vec3(0.0);
     float t;
@@ -220,6 +237,9 @@ void main() {
         pos = ro + rd * maxRayDistance;
     }
 
+    vec3 worldPos = planetRotation * pos;
+    normal = normalize(planetRotation * normal);
+
     float cloudMask = 0.0;
 
     // Only accumulate cloud noise when the view ray actually passes through the
@@ -228,11 +248,11 @@ void main() {
     float tAtm0, tAtm1;
     bool throughAtmosphere = hit || (intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
     if (throughAtmosphere) {
-        vec3 coverageSample = hit ? pos : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
+        vec3 coverageSample = hit ? worldPos : (planetRotation * (ro + rd * min(maxRayDistance, max(tAtm1, 0.0))));
         cloudMask = cloudCoverageField(normalize(coverageSample));
     }
 
-    gPositionHeight = vec4(pos, heightValue);
+    gPositionHeight = vec4(worldPos, heightValue);
     gNormalFlags = vec4(normal, waterFlag);
     gMaterial = vec4(baseColor, cloudMask);
 }

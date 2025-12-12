@@ -111,6 +111,15 @@ def draw_raymarch_panels(editing_params: PlanetParameters):
 
     imgui.end()
 
+
+def draw_rotation_panel(rotation_speed_deg: float) -> float:
+    imgui.begin("Animation")
+    _, rotation_speed_deg = imgui.slider_float(
+        "Rotation speed (deg/s)", rotation_speed_deg, -60.0, 60.0
+    )
+    imgui.end()
+    return rotation_speed_deg
+
     imgui.begin("Cloud Raymarch")
 
     _, editing_params.cloud_max_steps = imgui.input_int(
@@ -192,6 +201,9 @@ def main():
         parameters,
     )
     timer = DeltaTimer()
+
+    planet_rotation_angle = 0.0
+    planet_rotation_speed_deg = 6.0
 
     layer_visibility = [False] * 9
     pressed_state = [False] * 9
@@ -280,6 +292,13 @@ def main():
         update_clicked, reset_clicked = draw_parameter_panel(editing_params)
         draw_raymarch_panels(editing_params)
 
+        planet_rotation_speed_deg = draw_rotation_panel(planet_rotation_speed_deg)
+
+        rotation_speed_rad = np.deg2rad(planet_rotation_speed_deg)
+        planet_rotation_angle = (planet_rotation_angle + rotation_speed_rad * dt) % (
+            np.pi * 2.0
+        )
+
         if update_clicked:
             parameters = editing_params.copy()
             renderer.update_parameters(parameters)
@@ -301,7 +320,8 @@ def main():
             camera.up,
             width,
             height,
-            layer_visibility
+            layer_visibility,
+            planet_rotation_angle,
         )
 
         imgui.render()

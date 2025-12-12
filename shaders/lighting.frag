@@ -31,6 +31,20 @@ vec3 decodeAlbedo(vec2 uv) {
     return texture(gMaterial, uv).rgb;
 }
 
+vec3 computeSunTint(vec3 position, vec3 lightDir) {
+    float sunHeight = clamp(dot(normalize(position), lightDir), -1.0, 1.0);
+
+    float dayFactor = smoothstep(-0.22, 0.1, sunHeight);
+    float horizonWarmth = smoothstep(0.0, 0.35, 1.0 - abs(sunHeight)) * dayFactor;
+
+    vec3 nightColor = vec3(0.04, 0.07, 0.12);
+    vec3 dayColor = vec3(0.96, 0.96, 0.92);
+    vec3 goldenColor = vec3(1.08, 0.74, 0.44);
+
+    vec3 warmBlend = mix(dayColor, goldenColor, horizonWarmth);
+    return mix(nightColor, warmBlend, dayFactor);
+}
+
 float computeShadow(vec3 pos, vec3 normal) {
     vec3 lightDir = normalize(sunDir);
     float ndl = dot(normal, lightDir);
@@ -38,7 +52,15 @@ float computeShadow(vec3 pos, vec3 normal) {
     return clamp(ndl * 0.5 + 0.5, 0.0, 1.0) * horizon;
 }
 
-vec3 shadeWater(vec3 pos, vec3 normal, vec3 floorColor, float depth) {
+vec3 shadeWater(
+    vec3 pos,
+    vec3 normal,
+    vec3 floorColor,
+    float depth,
+    vec3 sunColor,
+    float shadow,
+    vec3 ambientLight
+) {
     vec3 lightDir = normalize(sunDir);
     vec3 viewDir = normalize(camPos - pos);
 
@@ -54,17 +76,19 @@ vec3 shadeWater(vec3 pos, vec3 normal, vec3 floorColor, float depth) {
     // Forward scattering brightens water that looks toward the sun.
     float forward = pow(max(dot(viewDir, lightDir), 0.0), 4.0);
     float scatterAmount = mix(0.12, 0.75, waterScattering);
-    vec3 inScattering = waterColor * (1.0 - absorption) * (0.35 + scatterAmount * (ndl * 0.6 + forward));
+    float sunFacing = ndl * 0.6 + forward;
+    vec3 inScattering = waterColor * (1.0 - absorption) * (0.25 + scatterAmount * sunFacing) * (sunColor * shadow + ambientLight);
 
     vec3 transmitted = floorColor * absorption;
-    vec3 reflected = waterColor * (0.35 + 0.65 * ndl);
+    vec3 reflected = mix(waterColor, sunColor, 0.25) * (0.35 + 0.65 * ndl * shadow);
 
     float fresnel = 0.02 + pow(1.0 - viewFacing, 5.0);
 
-    vec3 color = mix(transmitted + inScattering, reflected, fresnel);
+    vec3 ambientReflection = ambientLight * (0.25 + 0.35 * (1.0 - absorption));
+    vec3 color = mix(transmitted + inScattering, reflected + ambientReflection, fresnel);
 
-    float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 48.0);
-    color += spec * mix(0.08, 0.35, scatterAmount);
+    float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 48.0) * shadow;
+    color += spec * mix(0.08, 0.35, scatterAmount) * sunColor;
 
     return color;
 }
@@ -82,21 +106,32 @@ void main() {
     bool hit = waterFlag > -0.5;
 
     vec3 lightDir = normalize(sunDir);
+    vec3 viewDir = normalize(camPos - pos);
+
     float ndl = max(dot(normal, lightDir), 0.0);
     float horizonBlend = smoothstep(0.0, 0.22, ndl);
-    float ambient = 0.01;
-    float lighting = hit ? clamp(ambient + ndl * horizonBlend, 0.0, 1.0) : 0.0;
+    float sunHeight = dot(normalize(pos), lightDir);
+
+    vec3 sunColor = computeSunTint(pos, lightDir);
+    float twilight = smoothstep(-0.45, 0.05, sunHeight);
+    vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
+    float ambientStrength = mix(0.02, 0.14, twilight);
+
+    vec3 directLight = sunColor * ndl * horizonBlend;
+    vec3 ambient = ambientLight * ambientStrength;
 
     float shadow = hit ? computeShadow(pos, normal) : 0.0;
 
     float waterDepth = (waterFlag > 0.5) ? max(seaLevel - heightValue, 0.0) : 0.0;
-    vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth);
+    vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth, sunColor, shadow, ambient);
 
-    vec3 color = albedo * lighting;
+    vec3 color = albedo * (ambient + directLight * shadow);
     if (waterFlag > 0.5) {
         color = waterShaded;
+    } else {
+        float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 24.0) * shadow;
+        color += spec * sunColor * 0.18;
     }
-    color *= shadow;
 
     FragColor = vec4(color, shadow);
 }

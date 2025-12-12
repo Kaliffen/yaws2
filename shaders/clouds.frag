@@ -147,6 +147,15 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         vec3 samplePos = rayOrigin + rayDir * t;
 
         float density = sampleCloudDensity(samplePos, coverageHint) * cloudDensity;
+
+        // Thin clouds along grazing angles so the horizon view doesn't look overly
+        // opaque. When the view ray is nearly tangent to the planet surface the dot
+        // product between the ray and the local normal approaches zero; in that
+        // case, gently reduce density instead of letting the long march path fully
+        // accumulate.
+        float viewAlignment = abs(dot(-rayDir, normalize(samplePos)));
+        float horizonFade = mix(0.25, 1.0, smoothstep(0.05, 0.35, viewAlignment));
+        density *= horizonFade;
         if (density < 0.001) {
             continue;
         }

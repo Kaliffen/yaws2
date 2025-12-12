@@ -70,8 +70,12 @@ void main() {
     vec3 atmosphere = atmosphereSample.rgb;
     vec3 clouds = cloudSample.rgb;
 
-    vec3 composite = (lighting * atmosphereTransmittance) * cloudTransmittance;
-    composite += atmosphere * cloudTransmittance;
+    bool hitSurface = hit;
+    float litTransmittance = hitSurface ? mix(1.0, atmosphereTransmittance, 0.75) : atmosphereTransmittance;
+    vec3 composite = (lighting * litTransmittance) * cloudTransmittance;
+
+    float surfaceHaze = hitSurface ? 0.55 : 1.0;
+    composite += atmosphere * surfaceHaze * cloudTransmittance;
     composite += clouds;
 
     if (showLayer[0]) {

@@ -69,19 +69,19 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
 
     vec3 lightDir = normalize(sunDir);
     float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 3.5);
+    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
 
     float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
     float sunVisibility = smoothstep(-0.08, 0.12, sunFacing);
     float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0) * sunVisibility;
 
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
-    float density = (0.35 + 0.65 * (1.0 - altitudeNorm)) * pathFactor;
+    float density = (0.28 + 0.55 * (1.0 - altitudeNorm)) * pathFactor;
 
-    float scatter = horizonFactor * altitudeFalloff * density * sunVisibility;
-    scatter += mieForward * 0.08;
+    float scatter = horizonFactor * altitudeFalloff * density * sunVisibility * 0.85;
+    scatter += mieForward * 0.06;
 
-    vec3 atmosphereColor = vec3(0.32, 0.58, 0.96);
+    vec3 atmosphereColor = vec3(0.3, 0.54, 0.82);
     return atmosphereColor * scatter;
 }
 
@@ -96,7 +96,7 @@ void main() {
     vec3 atmosphere = computeAtmosphere(camPos, viewDir, pos, hit);
 
     float opticalDepth = length(atmosphere);
-    float transmittance = exp(-opticalDepth * 0.65);
+    float transmittance = exp(-opticalDepth * 0.55);
 
     FragColor = vec4(atmosphere, clamp(transmittance, 0.0, 1.0));
 }

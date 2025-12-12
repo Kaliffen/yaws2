@@ -1,21 +1,91 @@
-﻿import glfw
+import glfw
 from OpenGL.GL import *
+import imgui
+from imgui.integrations.glfw import GlfwRenderer
 import numpy as np
 
-from gl_utils.shader import compile_shader
 from gl_utils.program import create_program
 from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera
-from rendering.constants import HEIGHT_SCALE, PLANET_RADIUS
+from rendering.constants import PlanetParameters, default_planet_parameters
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer
 
 
-def compute_adaptive_speed(position, base_speed):
+def compute_adaptive_speed(position, base_speed, planet_radius):
     distance = np.linalg.norm(position)
-    distance_ratio = distance / PLANET_RADIUS
+    distance_ratio = distance / planet_radius
     adaptive_factor = np.clip(0.15 + distance_ratio * 0.85, 0.15, 4.0)
     return base_speed * adaptive_factor
+
+
+def clamp_to_radius(camera, min_radius):
+    distance = np.linalg.norm(camera.position)
+    if distance < min_radius and distance > 0.0:
+        camera.position = (camera.position / distance) * min_radius
+
+
+def draw_parameter_panel(editing_params: PlanetParameters):
+    imgui.begin("Planet Parameters")
+
+    changed, sun_dir = imgui.input_float3("Sun direction", *editing_params.sun_direction)
+    if changed:
+        editing_params.sun_direction = np.array(sun_dir, dtype=np.float32)
+
+    _, editing_params.planet_radius = imgui.input_float(
+        "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0
+    )
+    _, editing_params.atmosphere_radius = imgui.input_float(
+        "Atmosphere radius (km)", editing_params.atmosphere_radius, step=10.0, step_fast=50.0
+    )
+    _, editing_params.height_scale = imgui.input_float(
+        "Height scale (km)", editing_params.height_scale, step=10.0, step_fast=50.0
+    )
+    _, editing_params.sea_level = imgui.input_float(
+        "Sea level offset (km)", editing_params.sea_level, step=1.0, step_fast=5.0
+    )
+
+    changed, water_color = imgui.input_float3("Water color", *editing_params.water_color)
+    if changed:
+        editing_params.water_color = np.array(water_color, dtype=np.float32)
+    _, editing_params.water_absorption = imgui.input_float(
+        "Water absorption", editing_params.water_absorption, step=0.01, step_fast=0.05
+    )
+    _, editing_params.water_scattering = imgui.input_float(
+        "Water scattering", editing_params.water_scattering, step=0.01, step_fast=0.05
+    )
+
+    _, editing_params.max_ray_distance = imgui.input_float(
+        "Max ray distance", editing_params.max_ray_distance, step=50.0, step_fast=200.0
+    )
+
+    _, editing_params.cloud_base_altitude = imgui.input_float(
+        "Cloud base altitude", editing_params.cloud_base_altitude, step=0.5, step_fast=1.0
+    )
+    _, editing_params.cloud_layer_thickness = imgui.input_float(
+        "Cloud layer thickness", editing_params.cloud_layer_thickness, step=0.5, step_fast=1.0
+    )
+    _, editing_params.cloud_coverage = imgui.slider_float(
+        "Cloud coverage", editing_params.cloud_coverage, 0.0, 1.0
+    )
+    _, editing_params.cloud_density = imgui.slider_float(
+        "Cloud density", editing_params.cloud_density, 0.0, 1.0
+    )
+    changed, cloud_light = imgui.input_float3("Cloud light color", *editing_params.cloud_light_color)
+    if changed:
+        editing_params.cloud_light_color = np.array(cloud_light, dtype=np.float32)
+
+    update_clicked = False
+    reset_clicked = False
+
+    if imgui.button("Update", width=100):
+        update_clicked = True
+    imgui.same_line()
+    if imgui.button("Reset", width=100):
+        reset_clicked = True
+
+    imgui.end()
+    return update_clicked, reset_clicked
 
 
 def main():
@@ -58,8 +128,11 @@ def main():
 
     glUseProgram(gbuffer_program)
 
+    parameters = default_planet_parameters()
+    editing_params = parameters.copy()
+
     camera = FPSCamera(
-        position=np.array([0.0, 0.0, PLANET_RADIUS * 1.6], dtype=np.float32),
+        position=np.array([0.0, 0.0, parameters.planet_radius * 1.6], dtype=np.float32),
         yaw=-90.0,
         pitch=0.0
     )
@@ -67,8 +140,8 @@ def main():
     # ramps up automatically as you get farther from the planet.
     base_speed = 60.0
     camera.speed = base_speed
-    surface_radius = PLANET_RADIUS + HEIGHT_SCALE
-    camera.min_radius = surface_radius-  HEIGHT_SCALE * 0.95
+    surface_radius = parameters.planet_radius + parameters.height_scale
+    camera.min_radius = surface_radius - parameters.height_scale * 0.95
 
     renderer = PlanetRenderer(
         gbuffer_program,
@@ -76,6 +149,7 @@ def main():
         atmosphere_program,
         cloud_program,
         composite_program,
+        parameters,
     )
     timer = DeltaTimer()
 
@@ -87,8 +161,16 @@ def main():
 
     glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
 
+    imgui.create_context()
+    imgui_renderer = GlfwRenderer(window)
+
     while not glfw.window_should_close(window):
         dt = timer.get_delta()
+        glfw.poll_events()
+        imgui_renderer.process_inputs()
+        imgui.new_frame()
+
+        io = imgui.get_io()
 
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
@@ -103,37 +185,54 @@ def main():
         yoff = last_mouse_y - my
         last_mouse_x, last_mouse_y = mx, my
 
-        camera.process_mouse(xoff, yoff)
+        if not io.want_capture_mouse:
+            camera.process_mouse(xoff, yoff)
 
         # Keyboard
         shift_pressed = glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
         speed_multiplier = 10.0 if shift_pressed else 1.0
-        camera.speed = compute_adaptive_speed(camera.position, base_speed) * speed_multiplier
+        camera.speed = compute_adaptive_speed(camera.position, base_speed, parameters.planet_radius) * speed_multiplier
 
-        if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
-            camera.process_movement("FORWARD", dt)
-        if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
-            camera.process_movement("BACKWARD", dt)
-        if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
-            camera.process_movement("LEFT", dt)
-        if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
-            camera.process_movement("RIGHT", dt)
+        if not io.want_capture_keyboard:
+            if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
+                camera.process_movement("FORWARD", dt)
+            if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
+                camera.process_movement("BACKWARD", dt)
+            if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
+                camera.process_movement("LEFT", dt)
+            if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
+                camera.process_movement("RIGHT", dt)
 
-        for idx, key in enumerate([
-            glfw.KEY_1,
-            glfw.KEY_2,
-            glfw.KEY_3,
-            glfw.KEY_4,
-            glfw.KEY_5,
-            glfw.KEY_6,
-            glfw.KEY_7,
-            glfw.KEY_8,
-            glfw.KEY_9,
-        ]):
-            is_pressed = glfw.get_key(window, key) == glfw.PRESS
-            if is_pressed and not pressed_state[idx]:
-                layer_visibility[idx] = not layer_visibility[idx]
-            pressed_state[idx] = is_pressed
+            for idx, key in enumerate([
+                glfw.KEY_1,
+                glfw.KEY_2,
+                glfw.KEY_3,
+                glfw.KEY_4,
+                glfw.KEY_5,
+                glfw.KEY_6,
+                glfw.KEY_7,
+                glfw.KEY_8,
+                glfw.KEY_9,
+            ]):
+                is_pressed = glfw.get_key(window, key) == glfw.PRESS
+                if is_pressed and not pressed_state[idx]:
+                    layer_visibility[idx] = not layer_visibility[idx]
+                pressed_state[idx] = is_pressed
+
+        framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
+        width, height = framebuffer_width or width, framebuffer_height or height
+
+        update_clicked, reset_clicked = draw_parameter_panel(editing_params)
+
+        if update_clicked:
+            parameters = editing_params.copy()
+            renderer.update_parameters(parameters)
+            surface_radius = parameters.planet_radius + parameters.height_scale
+            camera.min_radius = surface_radius - parameters.height_scale * 0.95
+            clamp_to_radius(camera, camera.min_radius)
+            editing_params = parameters.copy()
+        elif reset_clicked:
+            editing_params = parameters.copy()
 
         glViewport(0, 0, width, height)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -149,8 +248,10 @@ def main():
             layer_visibility
         )
 
+        imgui.render()
+        imgui_renderer.render(imgui.get_draw_data())
+
         glfw.swap_buffers(window)
-        glfw.poll_events()
 
     glfw.terminate()
 

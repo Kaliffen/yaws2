@@ -1,5 +1,8 @@
-﻿import numpy as np
+from dataclasses import dataclass, field
+import numpy as np
 
+
+# Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
 
 # Base scale values for the planet and atmosphere (kilometers)
@@ -38,3 +41,49 @@ CLOUD_LAYER_THICKNESS = 8.0
 CLOUD_COVERAGE = 0.62
 CLOUD_DENSITY = 0.85
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
+
+
+def _copy_vector(vec: np.ndarray) -> np.ndarray:
+    return np.array(vec, dtype=np.float32)
+
+
+@dataclass
+class PlanetParameters:
+    """Container for all tweakable planet rendering parameters."""
+
+    sun_direction: np.ndarray = field(default_factory=lambda: _copy_vector(SUN_DIRECTION))
+    planet_radius: float = PLANET_RADIUS
+    atmosphere_radius: float = ATMOSPHERE_RADIUS
+    height_scale: float = HEIGHT_SCALE
+    sea_level: float = SEA_LEVEL
+    water_color: np.ndarray = field(default_factory=lambda: _copy_vector(WATER_COLOR))
+    water_absorption: float = WATER_ABSORPTION
+    water_scattering: float = WATER_SCATTERING
+    max_ray_distance: float = MAX_RAY_DISTANCE
+    cloud_base_altitude: float = CLOUD_BASE_ALTITUDE
+    cloud_layer_thickness: float = CLOUD_LAYER_THICKNESS
+    cloud_coverage: float = CLOUD_COVERAGE
+    cloud_density: float = CLOUD_DENSITY
+    cloud_light_color: np.ndarray = field(default_factory=lambda: _copy_vector(CLOUD_LIGHT_COLOR))
+
+    def copy(self) -> "PlanetParameters":
+        return PlanetParameters(
+            sun_direction=_copy_vector(self.sun_direction),
+            planet_radius=self.planet_radius,
+            atmosphere_radius=self.atmosphere_radius,
+            height_scale=self.height_scale,
+            sea_level=self.sea_level,
+            water_color=_copy_vector(self.water_color),
+            water_absorption=self.water_absorption,
+            water_scattering=self.water_scattering,
+            max_ray_distance=self.max_ray_distance,
+            cloud_base_altitude=self.cloud_base_altitude,
+            cloud_layer_thickness=self.cloud_layer_thickness,
+            cloud_coverage=self.cloud_coverage,
+            cloud_density=self.cloud_density,
+            cloud_light_color=_copy_vector(self.cloud_light_color),
+        )
+
+
+def default_planet_parameters() -> PlanetParameters:
+    return PlanetParameters()

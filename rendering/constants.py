@@ -67,6 +67,7 @@ PLANET_MIN_STEP_FACTOR = 0.5
 CLOUD_MAX_STEPS = 48
 CLOUD_EXTINCTION = 0.55
 CLOUD_PHASE_EXPONENT = 2.5
+CLOUD_ANIMATION_SPEED = 0.006
 
 # Planet orientation
 TILT_DEGREES = 23.5
@@ -105,6 +106,7 @@ class PlanetParameters:
     cloud_max_steps: int = CLOUD_MAX_STEPS
     cloud_extinction: float = CLOUD_EXTINCTION
     cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
+    cloud_animation_speed: float = CLOUD_ANIMATION_SPEED
     tilt_degrees: float = TILT_DEGREES
     time_speed: float = TIME_SPEED
 
@@ -150,6 +152,7 @@ class PlanetParameters:
             cloud_max_steps=self.cloud_max_steps,
             cloud_extinction=self.cloud_extinction,
             cloud_phase_exponent=self.cloud_phase_exponent,
+            cloud_animation_speed=self.cloud_animation_speed,
             sun_power=self.sun_power,
             tilt_degrees=self.tilt_degrees,
             time_speed=self.time_speed,

@@ -91,6 +91,7 @@ class PlanetRenderer:
         set_float(program, "cloudLayerThickness", self.parameters.cloud_layer_thickness)
         set_float(program, "cloudCoverage", self.parameters.cloud_coverage)
         set_float(program, "cloudDensity", self.parameters.cloud_density)
+        set_float(program, "cloudAnimationSpeed", self.parameters.cloud_animation_speed)
         set_vec3(program, "cloudLightColor", self.parameters.cloud_light_color)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))

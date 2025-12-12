@@ -25,6 +25,7 @@ uniform float aspect;
 uniform int cloudMaxSteps;
 uniform float cloudExtinction;
 uniform float cloudPhaseExponent;
+uniform float cloudAnimationSpeed;
 uniform mat3 worldToPlanet;
 uniform float timeSeconds;
 
@@ -91,8 +92,9 @@ mat3 rotationY(float angle) {
 }
 
 float cloudCoverageField(vec3 dir) {
-    float swirlAngle = timeSeconds * 0.012;
-    vec3 flowOffset = vec3(timeSeconds * 0.0007, 0.0, -timeSeconds * 0.0009);
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    float swirlAngle = cloudTime * 0.012;
+    vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
     vec3 spunDir = rotationY(swirlAngle) * dir;
 
     float bands = fbm(spunDir * 3.1 + vec3(1.7, -2.2, 0.5) + flowOffset);
@@ -104,8 +106,9 @@ float cloudCoverageField(vec3 dir) {
 
 float cloudShapeNoise(vec3 p) {
     vec3 normalizedP = p / planetRadius;
-    float swirlAngle = timeSeconds * 0.02;
-    vec3 flowOffset = vec3(timeSeconds * 0.0015, timeSeconds * 0.0006, -timeSeconds * 0.001);
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    float swirlAngle = cloudTime * 0.02;
+    vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
     vec3 warped = rotationY(swirlAngle) * normalizedP + flowOffset;
 
     float base = fbm(warped * 22.0 + vec3(8.2, 1.7, -3.4));

@@ -110,7 +110,12 @@ class PlanetParameters:
 
         self.cloud_base_altitude = atmosphere_thickness * cloud_base_ratio
         self.cloud_layer_thickness = atmosphere_thickness * cloud_thickness_ratio
-        self.max_ray_distance = self.planet_radius * MAX_RAY_DISTANCE_FACTOR
+        max_ray_distance_factor = (
+            self.max_ray_distance / self.planet_radius
+            if self.planet_radius > 0.0
+            else MAX_RAY_DISTANCE_FACTOR
+        )
+        self.max_ray_distance = self.planet_radius * max_ray_distance_factor
 
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(

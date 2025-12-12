@@ -67,7 +67,7 @@ class PlanetRenderer:
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
 
-    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, layer_visibility):
+    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
@@ -186,7 +186,6 @@ class PlanetRenderer:
         glBindTexture(GL_TEXTURE_2D, self.cloud_buffer["textures"][0])
         set_int(self.composite_program, "cloudTex", 5)
 
-        for i, visible in enumerate(layer_visibility):
-            set_int(self.composite_program, f"showLayer[{i}]", 1 if visible else 0)
+        set_int(self.composite_program, "debugLevel", debug_level)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)

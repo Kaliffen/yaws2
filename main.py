@@ -88,6 +88,11 @@ def draw_parameter_panel(editing_params: PlanetParameters):
 
     _, editing_params.sun_power = imgui.slider_float("Sun power", editing_params.sun_power, 0.0, 25.0)
 
+    _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
+    _, editing_params.spin_speed_deg_per_s = imgui.input_float(
+        "Spin speed (deg/s)", editing_params.spin_speed_deg_per_s, step=0.1, step_fast=1.0
+    )
+
     planet_changed, editing_params.planet_radius = imgui.input_float(
         "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0
     )
@@ -381,7 +386,8 @@ def main():
             camera.up,
             width,
             height,
-            debug_level
+            debug_level,
+            dt,
         )
 
         imgui.render()

@@ -1,8 +1,9 @@
 from OpenGL.GL import *
+import numpy as np
 
 from gl_utils.buffers import create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
-from rendering.uniforms import set_float, set_int, set_vec2, set_vec3
+from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
 
 
 class PlanetRenderer:
@@ -21,6 +22,36 @@ class PlanetRenderer:
         self.cam_forward = None
         self.cam_right = None
         self.cam_up = None
+        self.spin_angle_deg = 0.0
+        self.planet_to_world = np.identity(3, dtype=np.float32)
+        self.world_to_planet = np.identity(3, dtype=np.float32)
+
+    def _rotation_matrix_from_axis(self, axis: np.ndarray, angle_rad: float) -> np.ndarray:
+        axis = axis / np.linalg.norm(axis)
+        c = np.cos(angle_rad)
+        s = np.sin(angle_rad)
+        t = 1.0 - c
+        x, y, z = axis
+        return np.array(
+            [
+                [t * x * x + c, t * x * y - s * z, t * x * z + s * y],
+                [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
+                [t * x * z - s * y, t * y * z + s * x, t * z * z + c],
+            ],
+            dtype=np.float32,
+        )
+
+    def _update_rotation_matrices(self, dt: float) -> None:
+        self.spin_angle_deg = (self.spin_angle_deg + self.parameters.spin_speed_deg_per_s * dt) % 360.0
+        tilt_rad = np.deg2rad(self.parameters.tilt_degrees)
+        tilt_matrix = np.array(
+            [[1.0, 0.0, 0.0], [0.0, np.cos(tilt_rad), -np.sin(tilt_rad)], [0.0, np.sin(tilt_rad), np.cos(tilt_rad)]],
+            dtype=np.float32,
+        )
+        spin_axis = tilt_matrix @ np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        spin_matrix = self._rotation_matrix_from_axis(spin_axis, np.deg2rad(self.spin_angle_deg))
+        self.planet_to_world = spin_matrix @ tilt_matrix
+        self.world_to_planet = self.planet_to_world.T
 
     def _ensure_gbuffer(self, width, height):
         if self.gbuffer and self.gbuffer["width"] == width and self.gbuffer["height"] == height:
@@ -64,15 +95,18 @@ class PlanetRenderer:
         set_vec3(program, "waterColor", self.parameters.water_color)
         set_float(program, "waterAbsorption", self.parameters.water_absorption)
         set_float(program, "waterScattering", self.parameters.water_scattering)
+        set_mat3(program, "planetToWorld", self.planet_to_world)
+        set_mat3(program, "worldToPlanet", self.world_to_planet)
 
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
 
-    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level):
+    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, dt):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
         self.cam_up = cam_up
+        self._update_rotation_matrices(dt)
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
 

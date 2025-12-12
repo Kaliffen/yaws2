@@ -137,8 +137,14 @@ def main():
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL_TRUE)
 
-    width, height = 1280, 720
-    window = glfw.create_window(width, height, "SDF Planet Demo", None, None)
+    #width, height = 2560, 1440
+    # Get the primary monitor and its video mode
+    monitor = glfw.get_primary_monitor()
+    mode = glfw.get_video_mode(monitor)
+    width = mode.size.width
+    height = mode.size.height
+    window = glfw.create_window(width, height, "SDF Planet Demo", monitor, None)
+    
     if not window:
         glfw.terminate()
         raise RuntimeError("Failed to create window")

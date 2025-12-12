@@ -206,9 +206,9 @@ def main():
     glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL_TRUE)
 
     width, height = 1366, 768
-    # Get the primary monitor and its video mode
+    #Get the primary monitor and its video mode
     #monitor = glfw.get_primary_monitor()
-   # mode = glfw.get_video_mode(monitor)
+    #mode = glfw.get_video_mode(monitor)
     #width = mode.size.width
     #height = mode.size.height
     window = glfw.create_window(width, height, "SDF Planet Demo", None, None)

@@ -174,7 +174,8 @@ vec3 shadeSurface(vec3 p, vec3 rd) {
     float normalizedHeight = heightAboveSea / max(heightScale, 0.0001);
     normalizedHeight = normalizedHeight * 5;
     // Keep the coastline band thin so inland areas show their intended biomes.
-    float coastBlend = smoothstep(-0.06, 0.04, normalizedHeight);
+    // Use a sharper falloff to avoid the water tint bleeding far onto land.
+    float coastBlend = smoothstep(-0.02, 0.015, normalizedHeight);
     float landBlend = smoothstep(0.02, 0.32, normalizedHeight);
     float mountainBlend = smoothstep(0.35, 0.62, normalizedHeight);
     float snowBlend = smoothstep(0.65, 0.9, normalizedHeight);

@@ -28,31 +28,31 @@ def clamp_to_radius(camera, min_radius):
 def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
     presets = {
         "Low": {
-            "planet_max_steps": 180,
-            "planet_step_scale": 0.22,
-            "planet_min_step_factor": 0.7,
+            "planet_max_steps": 124,
+            "planet_step_scale": 0.3,
+            "planet_min_step_factor": 0.3,
             "cloud_max_steps": 28,
             "cloud_extinction": 0.65,
             "cloud_phase_exponent": 2.1,
-            "max_ray_distance_factor": 2.5,
+            "max_ray_distance_factor": 2,
         },
         "Medium": {
-            "planet_max_steps": 320,
-            "planet_step_scale": 0.17,
-            "planet_min_step_factor": 0.5,
+            "planet_max_steps": 128,
+            "planet_step_scale": 0.3,
+            "planet_min_step_factor": 0.2,
             "cloud_max_steps": 48,
             "cloud_extinction": 0.55,
             "cloud_phase_exponent": 2.5,
             "max_ray_distance_factor": 3.0,
         },
         "High": {
-            "planet_max_steps": 480,
-            "planet_step_scale": 0.12,
-            "planet_min_step_factor": 0.35,
+            "planet_max_steps": 256,
+            "planet_step_scale": 0.3,
+            "planet_min_step_factor": 0.1,
             "cloud_max_steps": 72,
             "cloud_extinction": 0.45,
             "cloud_phase_exponent": 3.0,
-            "max_ray_distance_factor": 3.6,
+            "max_ray_distance_factor": 4,
         },
     }
 
@@ -168,7 +168,7 @@ def draw_performance_panel(editing_params: PlanetParameters):
     imgui.separator()
     imgui.text("Planet raymarch")
     _, editing_params.planet_max_steps = imgui.input_int(
-        "Max steps", editing_params.planet_max_steps, step=1, step_fast=10
+        "Max p steps", editing_params.planet_max_steps, step=1, step_fast=10
     )
     editing_params.planet_max_steps = max(editing_params.planet_max_steps, 1)
 
@@ -182,7 +182,7 @@ def draw_performance_panel(editing_params: PlanetParameters):
     imgui.separator()
     imgui.text("Cloud raymarch")
     _, editing_params.cloud_max_steps = imgui.input_int(
-        "Max steps", editing_params.cloud_max_steps, step=1, step_fast=10
+        "Max c steps", editing_params.cloud_max_steps, step=1, step_fast=10
     )
     editing_params.cloud_max_steps = max(editing_params.cloud_max_steps, 1)
 
@@ -205,13 +205,13 @@ def main():
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL_TRUE)
 
-    #width, height = 2560, 1440
+    width, height = 1366, 768
     # Get the primary monitor and its video mode
-    monitor = glfw.get_primary_monitor()
-    mode = glfw.get_video_mode(monitor)
-    width = mode.size.width
-    height = mode.size.height
-    window = glfw.create_window(width, height, "SDF Planet Demo", monitor, None)
+    #monitor = glfw.get_primary_monitor()
+   # mode = glfw.get_video_mode(monitor)
+    #width = mode.size.width
+    #height = mode.size.height
+    window = glfw.create_window(width, height, "SDF Planet Demo", None, None)
     
     if not window:
         glfw.terminate()

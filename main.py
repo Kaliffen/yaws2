@@ -267,7 +267,7 @@ def main():
     )
     timer = DeltaTimer()
 
-    layer_visibility = [False] * 9
+    debug_level = 9
     pressed_state = [False] * 9
 
     camera_mode = True
@@ -345,7 +345,7 @@ def main():
             ]):
                 is_pressed = glfw.get_key(window, key) == glfw.PRESS
                 if is_pressed and not pressed_state[idx]:
-                    layer_visibility[idx] = not layer_visibility[idx]
+                    debug_level = idx + 1
                 pressed_state[idx] = is_pressed
 
         framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
@@ -375,7 +375,7 @@ def main():
             camera.up,
             width,
             height,
-            layer_visibility
+            debug_level
         )
 
         imgui.render()

@@ -14,18 +14,18 @@ uniform sampler2D cloudTex;
 uniform float heightScale;
 uniform float maxRayDistance;
 
-uniform bool showLayer[9];
+uniform int debugLevel;
 
-// Toggle indices
-// 0: sdf (depth visualization)
-// 1: height map
-// 2: lighting only
-// 3: shadow/occlusion debug
-// 4: water contribution
-// 5: atmosphere scatter
-// 6: clouds
-// 7: albedo
-// 8: final composite
+// Debug levels (1-9)
+// 1: sdf (depth visualization)
+// 2: height map
+// 3: albedo
+// 4: shadowed albedo
+// 5: lit surface (lighting buffer)
+// 6: lit surface with atmospheric attenuation
+// 7: add atmospheric scattering
+// 8: apply cloud transmittance
+// 9: full composite with clouds
 
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
@@ -70,46 +70,45 @@ void main() {
     vec3 atmosphere = atmosphereSample.rgb;
     vec3 clouds = cloudSample.rgb;
 
-    bool hitSurface = hit;
-    float litTransmittance = hitSurface ? mix(1.0, atmosphereTransmittance, 0.75) : atmosphereTransmittance;
-    vec3 composite = (lighting * litTransmittance) * cloudTransmittance;
+    int level = clamp(debugLevel, 1, 9);
 
-    float surfaceHaze = hitSurface ? 0.55 : 1.0;
-    composite += atmosphere * surfaceHaze * cloudTransmittance;
-    composite += clouds;
-
-    if (showLayer[0]) {
+    if (level == 1) {
         FragColor = vec4(vec3(sdfDepth), 1.0);
         return;
     }
-    if (showLayer[1]) {
+
+    if (level == 2) {
         FragColor = vec4(vec3(heightView), 1.0);
         return;
     }
-    if (showLayer[2]) {
-        FragColor = vec4(lighting, 1.0);
-        return;
+
+    vec3 surface = albedo;
+
+    if (level >= 4) {
+        surface *= shadow;
     }
-    if (showLayer[3]) {
-        FragColor = vec4(vec3(shadow), 1.0);
-        return;
+
+    if (level >= 5) {
+        surface = lighting;
     }
-    if (showLayer[4]) {
-        vec3 waterOnly = (waterFlag > 0.5) ? lighting : vec3(0.0);
-        FragColor = vec4(waterOnly, 1.0);
-        return;
+
+    bool hitSurface = hit;
+    float litTransmittance = 1.0;
+    if (level >= 6) {
+        litTransmittance = hitSurface ? mix(1.0, atmosphereTransmittance, 0.75) : atmosphereTransmittance;
     }
-    if (showLayer[5]) {
-        FragColor = vec4(atmosphere, 1.0);
-        return;
+
+    float cloudBlend = (level >= 8) ? cloudTransmittance : 1.0;
+
+    vec3 composite = surface * litTransmittance * cloudBlend;
+
+    if (level >= 7) {
+        float surfaceHaze = hitSurface ? 0.55 : 1.0;
+        composite += atmosphere * surfaceHaze * cloudBlend;
     }
-    if (showLayer[6]) {
-        FragColor = vec4(clouds, 1.0);
-        return;
-    }
-    if (showLayer[7]) {
-        FragColor = vec4(albedo, 1.0);
-        return;
+
+    if (level >= 9) {
+        composite += clouds;
     }
 
     FragColor = vec4(composite, 1.0);

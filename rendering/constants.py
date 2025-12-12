@@ -10,8 +10,19 @@ SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
 # when flying close to the surface.
 PLANET_RADIUS = 6371.0
 
-# Keep a thin atmospheric shell around the surface (~110 km thick).
-ATMOSPHERE_RADIUS = PLANET_RADIUS + 210.0
+# Express atmospheric and cloud heights as percentages of the planet radius
+# or atmosphere thickness so they automatically scale. A thinner 3% shell keeps
+# the atmosphere more believable while still visible at a distance, and the
+# cloud band lives comfortably within that shell.
+ATMOSPHERE_THICKNESS_PERCENT = 3.0
+ATMOSPHERE_THICKNESS_RATIO = ATMOSPHERE_THICKNESS_PERCENT / 100.0
+_BASELINE_ATMOSPHERE_THICKNESS = PLANET_RADIUS * ATMOSPHERE_THICKNESS_RATIO
+CLOUD_BASE_PERCENT = 35.0
+CLOUD_LAYER_THICKNESS_PERCENT = 25.0
+CLOUD_BASE_ALTITUDE_RATIO = CLOUD_BASE_PERCENT / 100.0
+CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
+
+ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
 # exaggerated features, but still allow visible mountain ranges.
@@ -31,13 +42,18 @@ WATER_SCATTERING = 0.14
 # Raymarch distances scale with the planet to ensure intersections are found
 # reliably without overshooting. A longer distance avoids missing the planet
 # when pulling far back for full-globe views.
-MAX_RAY_DISTANCE = PLANET_RADIUS * 3.0
+MAX_RAY_DISTANCE_FACTOR = 3.0
+MAX_RAY_DISTANCE = PLANET_RADIUS * MAX_RAY_DISTANCE_FACTOR
 
 # Cloud parameters keep volumetric sampling anchored to the planet instead of the
 # screen. A shallow layer near the surface produces convincing low-altitude
 # clouds without spilling deep into the atmosphere.
-CLOUD_BASE_ALTITUDE = 6.5
-CLOUD_LAYER_THICKNESS = 8.0
+_BASELINE_ATMOSPHERE_THICKNESS_RATIO = _BASELINE_ATMOSPHERE_THICKNESS / PLANET_RADIUS
+_BASELINE_CLOUD_BASE_ALTITUDE = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS_RATIO * CLOUD_BASE_ALTITUDE_RATIO
+_BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS_RATIO * CLOUD_LAYER_THICKNESS_RATIO
+
+CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
+CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
 CLOUD_COVERAGE = 0.62
 CLOUD_DENSITY = 0.85
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
@@ -62,6 +78,9 @@ class PlanetParameters:
 
     sun_direction: np.ndarray = field(default_factory=lambda: _copy_vector(SUN_DIRECTION))
     planet_radius: float = PLANET_RADIUS
+    atmosphere_thickness_percent: float = ATMOSPHERE_THICKNESS_PERCENT
+    cloud_base_percent: float = CLOUD_BASE_PERCENT
+    cloud_layer_thickness_percent: float = CLOUD_LAYER_THICKNESS_PERCENT
     atmosphere_radius: float = ATMOSPHERE_RADIUS
     height_scale: float = HEIGHT_SCALE
     sea_level: float = SEA_LEVEL
@@ -81,10 +100,25 @@ class PlanetParameters:
     cloud_extinction: float = CLOUD_EXTINCTION
     cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
 
+    def scale_with_planet_radius(self) -> None:
+        atmosphere_thickness = self.planet_radius * (self.atmosphere_thickness_percent / 100.0)
+        self.atmosphere_radius = self.planet_radius + atmosphere_thickness
+        cloud_base_ratio = np.clip(self.cloud_base_percent / 100.0, 0.0, 1.0)
+        cloud_thickness_ratio = np.clip(self.cloud_layer_thickness_percent / 100.0, 0.0, 1.0)
+        max_thickness_ratio = max(0.0, 1.0 - cloud_base_ratio)
+        cloud_thickness_ratio = min(cloud_thickness_ratio, max_thickness_ratio)
+
+        self.cloud_base_altitude = atmosphere_thickness * cloud_base_ratio
+        self.cloud_layer_thickness = atmosphere_thickness * cloud_thickness_ratio
+        self.max_ray_distance = self.planet_radius * MAX_RAY_DISTANCE_FACTOR
+
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(
             sun_direction=_copy_vector(self.sun_direction),
             planet_radius=self.planet_radius,
+            atmosphere_thickness_percent=self.atmosphere_thickness_percent,
+            cloud_base_percent=self.cloud_base_percent,
+            cloud_layer_thickness_percent=self.cloud_layer_thickness_percent,
             atmosphere_radius=self.atmosphere_radius,
             height_scale=self.height_scale,
             sea_level=self.sea_level,
@@ -107,4 +141,6 @@ class PlanetParameters:
 
 
 def default_planet_parameters() -> PlanetParameters:
-    return PlanetParameters()
+    params = PlanetParameters()
+    params.scale_with_planet_radius()
+    return params

@@ -10,6 +10,7 @@ uniform vec3 camForward;
 uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
+uniform float sunPower;
 uniform float aspect;
 
 // Planet Parameters

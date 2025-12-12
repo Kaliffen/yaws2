@@ -10,6 +10,7 @@ uniform sampler2D gMaterial;
 
 uniform vec3 camPos;
 uniform vec3 sunDir;
+uniform float sunPower;
 uniform float seaLevel;
 uniform vec3 waterColor;
 uniform float waterAbsorption;
@@ -117,7 +118,8 @@ void main() {
     float softHalo = smoothstep(-0.68, -0.08, rawNdl) * (1.0 - horizonBlend);
     float sunHeight = dot(normalize(pos), lightDir);
 
-    vec3 sunColor = computeSunTint(pos, lightDir);
+    float sunIntensity = max(sunPower, 0.0);
+    vec3 sunColor = computeSunTint(pos, lightDir) * sunIntensity;
     float twilight = smoothstep(-0.45, 0.05, sunHeight);
     vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
     float ambientStrength = mix(0.02, 0.14, twilight);

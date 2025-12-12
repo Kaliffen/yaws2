@@ -47,6 +47,7 @@ class PlanetRenderer:
         set_vec3(program, "camRight", self.cam_right)
         set_vec3(program, "camUp", self.cam_up)
         set_vec3(program, "sunDir", self.parameters.sun_direction)
+        set_float(program, "sunPower", self.parameters.sun_power)
         set_float(program, "planetRadius", self.parameters.planet_radius)
         set_float(program, "atmosphereRadius", self.parameters.atmosphere_radius)
         set_float(program, "heightScale", self.parameters.height_scale)

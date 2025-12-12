@@ -25,6 +25,22 @@ uniform int cloudMaxSteps;
 uniform float cloudExtinction;
 uniform float cloudPhaseExponent;
 
+vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
+    float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
+
+    float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
+    float horizonBand = smoothstep(0.02, 0.18, 1.0 - abs(sunHeight)) * smoothstep(-0.05, 0.18, sunHeight);
+
+    vec3 nightColor = vec3(0.03, 0.06, 0.10);
+    vec3 dayColor = vec3(0.96, 0.96, 0.92);
+    vec3 goldenColor = vec3(1.04, 0.70, 0.44);
+    vec3 twilightColor = vec3(0.44, 0.34, 0.56);
+
+    vec3 warmBlend = mix(dayColor, goldenColor, horizonBand);
+    vec3 base = mix(nightColor, warmBlend, dayFactor);
+    return mix(base, twilightColor, horizonBand * 0.55);
+}
+
 float hash(vec3 p) {
     p = fract(p * 0.3183099 + vec3(0.1));
     p *= 17.0;
@@ -146,6 +162,8 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         float t = start + stepSize * (float(i) + 0.5);
         vec3 samplePos = rayOrigin + rayDir * t;
 
+        vec3 localNormal = normalize(samplePos);
+        float sunHeight = dot(localNormal, lightDir);
         float density = sampleCloudDensity(samplePos, coverageHint) * cloudDensity;
 
         // Thin clouds along grazing angles so the horizon view doesn't look overly
@@ -160,11 +178,18 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
             continue;
         }
 
-        float lightAmount = smoothstep(0.0, 0.18, dot(normalize(samplePos), lightDir));
+        float lightAmount = smoothstep(0.02, 0.18, sunHeight);
+        float sunVisibility = smoothstep(-0.28, 0.05, sunHeight);
         float phase = mix(0.55, 1.0, pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent));
 
         float extinction = density * stepSize * cloudExtinction;
-        vec3 scatter = cloudLightColor * density * stepSize * lightAmount * mix(0.35, 1.0, phase);
+
+        vec3 sunColor = computeSunTint(localNormal, lightDir);
+        vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.35, 1.0, phase) * sunVisibility;
+        vec3 ambient = mix(vec3(0.01, 0.015, 0.02), vec3(0.08, 0.10, 0.12), sunVisibility);
+        vec3 warmTwilight = vec3(0.16, 0.11, 0.10) * smoothstep(-0.12, 0.08, sunHeight) * (1.0 - lightAmount);
+
+        vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize;
 
         accum += scatter * transmittance;
         transmittance *= exp(-extinction);

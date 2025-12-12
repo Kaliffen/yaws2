@@ -160,7 +160,7 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
 
     // Keep the coastline as a relatively thin band so inland regions pick up the
     // intended greens and browns instead of the sandy coastline tint.
-    float coastBlend = smoothstep(-0.06, 0.04, normalizedHeight);
+    float coastBlend = smoothstep(-0.06, 0.01, normalizedHeight);
     float landBlend = smoothstep(0.02, 0.32, normalizedHeight);
     float mountainBlend = smoothstep(0.35, 0.62, normalizedHeight);
     float snowBlend = smoothstep(0.65, 0.9, normalizedHeight);

@@ -29,8 +29,8 @@ def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
     presets = {
         "Low": {
             "planet_max_steps": 124,
-            "planet_step_scale": 0.3,
-            "planet_min_step_factor": 0.3,
+            "planet_step_scale": 0.2,
+            "planet_min_step_factor": 0.2,
             "cloud_max_steps": 28,
             "cloud_extinction": 0.65,
             "cloud_phase_exponent": 2.1,
@@ -38,8 +38,8 @@ def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
         },
         "Medium": {
             "planet_max_steps": 128,
-            "planet_step_scale": 0.3,
-            "planet_min_step_factor": 0.2,
+            "planet_step_scale": 0.2,
+            "planet_min_step_factor": 0.1,
             "cloud_max_steps": 48,
             "cloud_extinction": 0.55,
             "cloud_phase_exponent": 2.5,
@@ -47,12 +47,12 @@ def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
         },
         "High": {
             "planet_max_steps": 256,
-            "planet_step_scale": 0.3,
+            "planet_step_scale": 0.1,
             "planet_min_step_factor": 0.1,
-            "cloud_max_steps": 72,
+            "cloud_max_steps": 48,
             "cloud_extinction": 0.45,
             "cloud_phase_exponent": 3.0,
-            "max_ray_distance_factor": 4,
+            "max_ray_distance_factor": 3,
         },
     }
 

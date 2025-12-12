@@ -72,7 +72,9 @@ def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
 def draw_parameter_panel(editing_params: PlanetParameters):
     io = imgui.get_io()
     right_panel_width = max(io.display_size.x * 0.28, 360.0)
-    imgui.set_next_window_pos(io.display_size.x - right_panel_width - 12.0, 12.0, condition=imgui.FIRST_USE_EVER)
+    imgui.set_next_window_position(
+        io.display_size.x - right_panel_width - 12.0, 12.0, condition=imgui.FIRST_USE_EVER
+    )
     imgui.set_next_window_size(right_panel_width, 0.0, condition=imgui.FIRST_USE_EVER)
     imgui.begin("Planet Parameters")
 
@@ -142,7 +144,7 @@ def draw_parameter_panel(editing_params: PlanetParameters):
 def draw_performance_panel(editing_params: PlanetParameters):
     io = imgui.get_io()
     left_panel_width = max(io.display_size.x * 0.28, 340.0)
-    imgui.set_next_window_pos(12.0, 12.0, condition=imgui.FIRST_USE_EVER)
+    imgui.set_next_window_position(12.0, 12.0, condition=imgui.FIRST_USE_EVER)
     imgui.set_next_window_size(left_panel_width, 0.0, condition=imgui.FIRST_USE_EVER)
     imgui.begin("Performance & Raymarching")
 

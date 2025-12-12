@@ -72,15 +72,14 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 3.5);
 
     float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
-    float sunWrap = clamp(sunFacing * 0.6 + 0.4, 0.0, 1.0);
-    float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0);
+    float sunVisibility = smoothstep(-0.08, 0.12, sunFacing);
+    float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0) * sunVisibility;
 
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
     float density = (0.35 + 0.65 * (1.0 - altitudeNorm)) * pathFactor;
 
-    float scatter = horizonFactor * (0.22 + 0.78 * sunWrap) * altitudeFalloff * density;
-    scatter += mieForward * 0.08 * sunWrap;
-    scatter = max(scatter, 0.02 * pathFactor);
+    float scatter = horizonFactor * altitudeFalloff * density * sunVisibility;
+    scatter += mieForward * 0.08;
 
     vec3 atmosphereColor = vec3(0.32, 0.58, 0.96);
     return atmosphereColor * scatter;

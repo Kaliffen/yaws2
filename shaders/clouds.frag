@@ -148,11 +148,11 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
             continue;
         }
 
-        float lightAmount = clamp(dot(normalize(samplePos), lightDir) * 0.6 + 0.4, 0.0, 1.0);
+        float lightAmount = smoothstep(0.0, 0.18, dot(normalize(samplePos), lightDir));
         float phase = mix(0.55, 1.0, pow(max(dot(rayDir, lightDir), 0.0), 2.5));
 
         float extinction = density * stepSize * 0.55;
-        vec3 scatter = cloudLightColor * density * stepSize * (0.6 + 0.4 * lightAmount) * phase;
+        vec3 scatter = cloudLightColor * density * stepSize * lightAmount * mix(0.35, 1.0, phase);
 
         accum += scatter * transmittance;
         transmittance *= exp(-extinction);

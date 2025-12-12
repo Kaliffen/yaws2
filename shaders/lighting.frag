@@ -138,11 +138,15 @@ void main() {
 
     float sunIntensity = max(sunPower, 0.0);
     vec3 sunColor = computeSunTint(pos, lightDir) * sunIntensity;
+    float sunVisibility = smoothstep(-0.08, 0.05, sunHeight);
+    vec3 effectiveSunColor = sunColor * sunVisibility;
     float twilight = smoothstep(-0.45, 0.05, sunHeight);
     vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
     float ambientStrength = mix(0.02, 0.14, twilight);
 
-    vec3 directLight = sunColor * (wrapNdl * horizonBlend + softHalo * 0.5);
+    softHalo *= sunVisibility;
+
+    vec3 directLight = effectiveSunColor * (wrapNdl * horizonBlend + softHalo * 0.5);
     vec3 ambient = ambientLight * (ambientStrength + softHalo * 0.25);
 
     float shadow = hit ? computeShadow(pos, normal) : 0.0;
@@ -164,19 +168,19 @@ void main() {
     }
 
     float waterDepth = (waterFlag > 0.5) ? max(seaLevel - heightValue, 0.0) : 0.0;
-    vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth, waterPath, sunColor, shadow, ambient);
+    vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth, waterPath, effectiveSunColor, shadow, ambient);
 
     vec3 color = albedo * (ambient + directLight * shadow);
     if (waterFlag > 0.5) {
         color = waterShaded;
     } else {
         float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 24.0) * shadow;
-        color += spec * sunColor * 0.08;
+        color += spec * effectiveSunColor * 0.08;
 
         if (waterPath > 0.0) {
             float waterAtten = exp(-waterAbsorption * waterPath * 0.65);
             float murk = smoothstep(0.0, 120.0, waterPath);
-            vec3 fog = mix(waterColor * 0.35, waterColor * 0.6, murk) * (sunColor * 0.25 + ambient * 0.5);
+            vec3 fog = mix(waterColor * 0.35, waterColor * 0.6, murk) * (effectiveSunColor * 0.25 + ambient * 0.5);
             color = mix(fog, color, waterAtten);
         }
     }

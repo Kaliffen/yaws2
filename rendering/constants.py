@@ -68,6 +68,10 @@ CLOUD_MAX_STEPS = 48
 CLOUD_EXTINCTION = 0.55
 CLOUD_PHASE_EXPONENT = 2.5
 
+# Planet orientation
+TILT_DEGREES = 23.5
+SPIN_SPEED_DEG_PER_S = 6.0
+
 
 def _copy_vector(vec: np.ndarray) -> np.ndarray:
     return np.array(vec, dtype=np.float32)
@@ -101,6 +105,8 @@ class PlanetParameters:
     cloud_max_steps: int = CLOUD_MAX_STEPS
     cloud_extinction: float = CLOUD_EXTINCTION
     cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
+    tilt_degrees: float = TILT_DEGREES
+    spin_speed_deg_per_s: float = SPIN_SPEED_DEG_PER_S
 
     def scale_with_planet_radius(self) -> None:
         atmosphere_thickness = self.planet_radius * (self.atmosphere_thickness_percent / 100.0)
@@ -145,6 +151,8 @@ class PlanetParameters:
             cloud_extinction=self.cloud_extinction,
             cloud_phase_exponent=self.cloud_phase_exponent,
             sun_power=self.sun_power,
+            tilt_degrees=self.tilt_degrees,
+            spin_speed_deg_per_s=self.spin_speed_deg_per_s,
         )
 
 

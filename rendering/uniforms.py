@@ -29,4 +29,9 @@ def set_mat4(program, name, m):
 
 def set_mat3(program, name, m):
     loc = glGetUniformLocation(program, name)
-    glUniformMatrix3fv(loc, 1, GL_FALSE, m.astype("float32").T.flatten())
+    glUniformMatrix3fv(
+        loc,
+        1,
+        GL_FALSE,
+        np.array(m, dtype=np.float32).flatten(order="F"),
+    )

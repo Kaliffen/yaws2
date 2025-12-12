@@ -7,6 +7,7 @@ SUN_DIRECTION = np.array([0.62, 0.32, 0.71], dtype=np.float32)
 AXIAL_TILT_DEGREES = 23.5
 TIME_OF_DAY_HOURS = 12.0
 TIME_OF_YEAR = 0.0
+ROTATION_SPEED_HOURS_PER_SEC = 0.25
 
 # Base scale values for the planet and atmosphere (kilometers)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct
@@ -75,6 +76,25 @@ def _copy_vector(vec: np.ndarray) -> np.ndarray:
     return np.array(vec, dtype=np.float32)
 
 
+def _rotate_vector(vector: np.ndarray, axis: np.ndarray, angle_rad: float) -> np.ndarray:
+    axis_norm = np.linalg.norm(axis)
+    if axis_norm == 0.0:
+        return vector
+
+    axis_unit = axis / axis_norm
+    cos_a = np.cos(angle_rad)
+    sin_a = np.sin(angle_rad)
+    cross = np.cross(axis_unit, vector)
+    dot = np.dot(axis_unit, vector)
+
+    rotated = (
+        vector * cos_a
+        + cross * sin_a
+        + axis_unit * dot * (1.0 - cos_a)
+    )
+    return rotated.astype(np.float32)
+
+
 @dataclass
 class PlanetParameters:
     """Container for all tweakable planet rendering parameters."""
@@ -105,6 +125,7 @@ class PlanetParameters:
     axial_tilt_degrees: float = AXIAL_TILT_DEGREES
     time_of_day_hours: float = TIME_OF_DAY_HOURS
     time_of_year: float = TIME_OF_YEAR
+    rotation_speed_hours_per_sec: float = ROTATION_SPEED_HOURS_PER_SEC
 
     def scale_with_planet_radius(self) -> None:
         atmosphere_thickness = self.planet_radius * (self.atmosphere_thickness_percent / 100.0)
@@ -122,16 +143,21 @@ class PlanetParameters:
         day_angle = (self.time_of_day_hours / 24.0) * (2.0 * np.pi)
         seasonal_angle = self.time_of_year * (2.0 * np.pi)
         tilt_rad = np.deg2rad(self.axial_tilt_degrees)
-        declination = tilt_rad * np.sin(seasonal_angle)
 
-        sun_dir = np.array(
-            [
-                np.cos(declination) * np.cos(day_angle),
-                np.sin(declination),
-                np.cos(declination) * np.sin(day_angle),
-            ],
-            dtype=np.float32,
+        orbital_sun_dir = _rotate_vector(
+            np.array([0.0, 0.0, -1.0], dtype=np.float32),
+            np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            seasonal_angle,
         )
+
+        tilted_axis = _rotate_vector(
+            np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            tilt_rad,
+        )
+
+        sun_dir = _rotate_vector(orbital_sun_dir, tilted_axis, day_angle)
+
         norm = np.linalg.norm(sun_dir)
         if norm > 0:
             sun_dir /= norm
@@ -165,6 +191,7 @@ class PlanetParameters:
             axial_tilt_degrees=self.axial_tilt_degrees,
             time_of_day_hours=self.time_of_day_hours,
             time_of_year=self.time_of_year,
+            rotation_speed_hours_per_sec=self.rotation_speed_hours_per_sec,
         )
 
 

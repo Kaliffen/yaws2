@@ -37,6 +37,12 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     tilt_changed, editing_params.axial_tilt_degrees = imgui.slider_float(
         "Axial tilt (deg)", editing_params.axial_tilt_degrees, 0.0, 45.0
     )
+    _, editing_params.rotation_speed_hours_per_sec = imgui.slider_float(
+        "Rotation speed (hours/sec)",
+        editing_params.rotation_speed_hours_per_sec,
+        0.0,
+        2.0,
+    )
     if time_changed or year_changed or tilt_changed:
         editing_params.update_sun_direction()
     imgui.text(
@@ -227,6 +233,13 @@ def main():
         glfw.poll_events()
         imgui_renderer.process_inputs()
         imgui.new_frame()
+
+        if parameters.rotation_speed_hours_per_sec != 0.0:
+            hours_advanced = parameters.rotation_speed_hours_per_sec * dt
+            parameters.time_of_day_hours = (parameters.time_of_day_hours + hours_advanced) % 24.0
+            parameters.update_sun_direction()
+            editing_params.time_of_day_hours = parameters.time_of_day_hours
+            editing_params.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
 
         io = imgui.get_io()
 

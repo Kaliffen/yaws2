@@ -149,11 +149,11 @@ void main() {
 
     vec3 toPos = pos - camPos;
     float distToPos = length(toPos);
-    vec3 viewDir = distToPos > 0.0 ? toPos / distToPos : vec3(0.0, 0.0, 1.0);
+    vec3 viewDir2 = distToPos > 0.0 ? toPos / distToPos : vec3(0.0, 0.0, 1.0);
 
     float t0, t1;
     float waterRadius = planetRadius + seaLevel;
-    bool throughWater = intersectSphere(camPos, viewDir, waterRadius, t0, t1);
+    bool throughWater = intersectSphere(camPos, viewDir2, waterRadius, t0, t1);
     float waterPath = 0.0;
     if (throughWater && t1 > 0.0) {
         if (t0 < 0.0) t0 = 0.0;

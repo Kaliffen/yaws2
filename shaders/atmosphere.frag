@@ -16,6 +16,7 @@ uniform float sunPower;
 uniform float planetRadius;
 uniform float atmosphereRadius;
 uniform float aspect;
+uniform float lengthScale;
 uniform mat3 worldToPlanet;
 
 vec3 decodePosition(vec2 uv) {
@@ -96,6 +97,9 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
 
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
     float density = (0.28 + 0.55 * (1.0 - altitudeNorm)) * pathFactor;
+
+    float densityScale = 1.0 / max(lengthScale, 1e-4);
+    density *= densityScale;
 
     float scatter = horizonFactor * altitudeFalloff * density * sunVisibility * 0.72;
     scatter += mieForward * 0.06;

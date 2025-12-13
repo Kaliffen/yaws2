@@ -123,6 +123,7 @@ class PlanetRenderer:
         set_vec3(program, "waterColor", self.parameters.water_color)
         set_float(program, "waterAbsorption", scaled_water_absorption)
         set_float(program, "waterScattering", self.parameters.water_scattering)
+        set_float(program, "lengthScale", length_scale)
         set_mat3(program, "planetToWorld", self.planet_to_world)
         set_mat3(program, "worldToPlanet", self.world_to_planet)
 

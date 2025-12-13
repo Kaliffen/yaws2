@@ -105,8 +105,8 @@ float cloudCoverageField(vec3 dir) {
     float base = fbm(lookup);
     float billow = 1.0 - abs(fbm(lookup * 1.9 + vec3(-2.0, 3.1, 0.5)) * 2.0 - 1.0);
     float coverage = mix(base, billow, 0.55);
-    coverage = coverage * cloudCoverage + 0.2;
-    return clamp(smoothstep(0.35, 0.75, coverage), 0.0, 1.0);
+    coverage = coverage * (cloudCoverage + 0.35) + 0.15;
+    return clamp(smoothstep(0.28, 0.68, coverage), 0.0, 1.0);
 }
 
 float cloudShapeNoise(vec3 p) {
@@ -126,10 +126,10 @@ float sampleCloudDensity(vec3 p, float coverageHint) {
     float heightNorm = clamp((length(p) - layerBaseRadius) / max(cloudLayerThickness, 0.001), 0.0, 1.0);
 
     float coverage = cloudCoverageField(normalize(p));
-    coverage = mix(coverage, coverageHint, 0.25);
+    coverage = mix(coverage, coverageHint, 0.35);
 
     float shape = cloudShapeNoise(p);
-    float density = (shape - 0.5) * 1.8;
+    float density = (shape - 0.48) * 2.1;
     density = clamp(density * coverage, 0.0, 1.0);
 
     float bottomFade = smoothstep(0.04, 0.24, heightNorm);
@@ -220,17 +220,21 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         float forwardScatter = pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent);
         float phase = mix(0.42, 0.78, forwardScatter);
         float lowLightAtten = mix(0.4, 1.0, sunVisibility);
-        float diffuseDimming = mix(0.65, 1.0, lightAmount);
+        float diffuseDimming = mix(0.55, 1.0, lightAmount);
+        float twilightMask = smoothstep(-0.25, 0.05, sunHeight) * (1.0 - lightAmount);
+        float twilightDimming = mix(0.6, 1.0, 1.0 - twilightMask * 0.7);
 
         float extinction = density * stepSize * cloudExtinction;
 
         float sunIntensity = max(sunPower, 0.0);
         vec3 sunColor = computeSunTint(localNormal, lightDir) * sunIntensity;
         vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.4, 0.82, phase) * sunVisibility * lowLightAtten;
+        directLight *= mix(0.55, 1.0, lightAmount + sunVisibility * 0.35);
         vec3 ambient = mix(vec3(0.02, 0.025, 0.03), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
-        vec3 warmTwilight = vec3(0.14, 0.10, 0.10) * smoothstep(-0.12, 0.04, sunHeight) * (1.0 - lightAmount) * sunIntensity * 0.3 * lowLightAtten;
+        ambient *= mix(0.5, 1.0, lightAmount + sunVisibility * 0.5);
+        vec3 warmTwilight = vec3(0.12, 0.09, 0.10) * twilightMask * sunIntensity * 0.18 * lowLightAtten;
 
-        vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize * diffuseDimming;
+        vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize * diffuseDimming * twilightDimming;
 
         accum += scatter * transmittance;
         transmittance *= exp(-extinction);

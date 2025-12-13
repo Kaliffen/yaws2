@@ -20,6 +20,8 @@ uniform float atmosphereRadius;
 uniform float heightScale;
 uniform float maxRayDistance;
 uniform float seaLevel;
+uniform float cloudBaseAltitude;
+uniform float cloudLayerThickness;
 uniform int planetMaxSteps;
 uniform float planetStepScale;
 uniform float planetMinStepFactor;
@@ -29,6 +31,7 @@ uniform mat3 worldToPlanet;
 uniform float timeSeconds;
 uniform float cloudAnimationSpeed;
 uniform sampler3D coverageNoiseTex;
+uniform sampler3D shapeNoiseTex;
 
 // Water Parameters
 uniform vec3 waterColor;
@@ -103,6 +106,36 @@ float cloudCoverageField(vec3 dir) {
     float coverage = noiseSample.x * 0.65 + noiseSample.y * 0.45 + noiseSample.z * 0.12;
     coverage = coverage * cloudCoverage + 0.12;
     return clamp(smoothstep(0.28, 0.76, coverage), 0.0, 1.0);
+}
+
+float cloudShapeNoise(vec3 p) {
+    vec3 normalizedP = p / planetRadius;
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    float swirlAngle = cloudTime * 0.02;
+    vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
+    vec3 uvw = clamp(wrapNoiseCoord(rotationY(swirlAngle) * normalizedP + flowOffset), 0.0, 1.0);
+    vec3 detailUvw = clamp(wrapNoiseCoord(rotationY(swirlAngle * 1.35) * normalizedP * 1.8 + flowOffset * 1.7), 0.0, 1.0);
+
+    vec3 base = texture(shapeNoiseTex, uvw).xyz;
+    vec3 detail = texture(shapeNoiseTex, detailUvw).xyz;
+    float baseShape = base.x * 0.55 + base.y * 0.3 + base.z * 0.15;
+    float detailShape = detail.x * 0.35 + detail.y * 0.35 + detail.z * 0.3;
+    return mix(baseShape, detailShape, 0.42);
+}
+
+float gbufferCloudHint(vec3 p) {
+    float layerBaseRadius = planetRadius + cloudBaseAltitude;
+    float heightNorm = clamp((length(p) - layerBaseRadius) / max(cloudLayerThickness, 0.001), 0.0, 1.0);
+
+    float coverage = cloudCoverageField(normalize(p));
+    float shape = cloudShapeNoise(p);
+    float density = (shape - 0.42) * 1.85;
+    density = clamp(density * coverage, 0.0, 1.0);
+    density = density * density * (3.0 - 2.0 * density);
+
+    float bottomFade = smoothstep(0.08, 0.22, heightNorm);
+    float topFade = 1.0 - smoothstep(0.65, 0.98, heightNorm);
+    return density * bottomFade * topFade;
 }
 
 // Terrain Height and SDF
@@ -286,7 +319,7 @@ void main() {
     bool throughAtmosphere = hit || (intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
     if (throughAtmosphere) {
         vec3 coverageSample = hit ? posPlanet : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
-        cloudMask = cloudCoverageField(normalize(coverageSample));
+        cloudMask = gbufferCloudHint(coverageSample);
     }
 
     vec3 posWorld = planetToWorld * posPlanet;

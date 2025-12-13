@@ -238,7 +238,7 @@ class PlanetRenderer:
         set_int(self.gbuffer_program, "planetMaxSteps", self.parameters.planet_max_steps)
         set_float(self.gbuffer_program, "planetStepScale", self.parameters.planet_step_scale)
         set_float(self.gbuffer_program, "planetMinStepFactor", self.parameters.planet_min_step_factor)
-        self._bind_coverage_texture(self.gbuffer_program, 4)
+        self._bind_cloud_noise_textures(self.gbuffer_program, coverage_unit=4, shape_unit=5)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 

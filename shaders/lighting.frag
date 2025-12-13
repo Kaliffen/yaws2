@@ -17,6 +17,28 @@ uniform float seaLevel;
 uniform vec3 waterColor;
 uniform float waterAbsorption;
 uniform float waterScattering;
+uniform float timeSeconds;
+uniform mat3 worldToPlanet;
+
+vec3 buildTangent(vec3 n) {
+    vec3 up = abs(n.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 t = normalize(cross(up, n));
+    return t;
+}
+
+vec3 waterSurfaceNormal(vec3 pos, vec3 normal) {
+    vec3 tangent = buildTangent(normal);
+    vec3 bitangent = normalize(cross(normal, tangent));
+
+    vec2 waveCoords = vec2(dot(pos, tangent), dot(pos, bitangent));
+    float slowWaves = sin(dot(waveCoords, vec2(0.18, 0.23)) * 48.0 + timeSeconds * 0.5);
+    float fastWaves = sin(dot(waveCoords, vec2(-0.41, 0.27)) * 96.0 + timeSeconds * 1.8);
+    float choppy = sin(dot(waveCoords, vec2(0.33, -0.52)) * 72.0 + timeSeconds * 1.1);
+
+    vec2 waveTilt = vec2(slowWaves * 0.35 + choppy * 0.15, fastWaves * 0.25 + choppy * 0.25);
+    vec3 bumped = normalize(normal + tangent * waveTilt.x + bitangent * waveTilt.y);
+    return bumped;
+}
 
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
@@ -74,9 +96,11 @@ vec3 shadeWater(
     vec3 lightDir = normalize(sunDir);
     vec3 viewDir = normalize(camPos - pos);
 
-    float ndl = max(dot(normal, lightDir), 0.0);
-    float viewFacing = max(dot(normal, viewDir), 0.0);
-    float entryCos = max(dot(normal, -viewDir), 0.05);
+    vec3 surfaceNormal = waterSurfaceNormal(pos, normal);
+
+    float ndl = max(dot(surfaceNormal, lightDir), 0.0);
+    float viewFacing = max(dot(surfaceNormal, viewDir), 0.0);
+    float entryCos = max(dot(surfaceNormal, -viewDir), 0.05);
 
     // Beer-Lambert attenuation scaled by incidence angle so grazing views
     // travel through more water and darken appropriately.
@@ -98,8 +122,9 @@ vec3 shadeWater(
     vec3 ambientReflection = ambientLight * (0.25 + 0.35 * (1.0 - absorption));
     vec3 color = mix(transmitted + inScattering, reflected + ambientReflection, fresnel);
 
-    float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 48.0) * shadow;
-    color += spec * mix(0.08, 0.35, scatterAmount) * sunColor;
+    float highlight = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 48.0) * shadow;
+    float sparkle = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 96.0) * 0.25;
+    color += (highlight * mix(0.08, 0.35, scatterAmount) + sparkle) * sunColor;
 
     return color;
 }
@@ -119,6 +144,7 @@ void main() {
 
     vec3 lightDir = normalize(sunDir);
     vec3 viewDir = normalize(camPos - pos);
+    bool cameraUnderwater = length(worldToPlanet * camPos) < planetRadius + seaLevel;
 
     float rawNdl = dot(normal, lightDir);
     float ndl = max(rawNdl, 0.0);
@@ -163,6 +189,14 @@ void main() {
             vec3 fog = mix(waterColor * 0.35, waterColor * 0.6, murk) * (effectiveSunColor * 0.25 + ambient * 0.5);
             color = mix(fog, color, waterAtten);
         }
+    }
+
+    if (cameraUnderwater) {
+        float waterDepthFromCamera = (planetRadius + seaLevel) - length(worldToPlanet * camPos);
+        float underwaterLength = max(waterDepthFromCamera + waterPath, 0.0);
+        float attenuation = exp(-waterAbsorption * underwaterLength * 0.35);
+        vec3 underwaterFog = waterColor * (0.35 + waterScattering * 0.35);
+        color = mix(underwaterFog * (ambient + effectiveSunColor * 0.15), color, attenuation);
     }
 
     FragColor = vec4(color, shadow);

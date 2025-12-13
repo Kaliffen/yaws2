@@ -228,6 +228,8 @@ void main() {
     bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, tWater0, tWater1) && tWater1 > 0.0;
     if (hitWaterSphere && tWater0 < 0.0) tWater0 = 0.0;
 
+    bool cameraUnderwater = length(ro) < waterRadius;
+
     float marchStart = 0.0;
     float marchEnd = maxRayDistance;
 
@@ -241,6 +243,11 @@ void main() {
 
     float shellPadding = max(heightScale * 1.2, planetRadius * 0.001);
 
+    float waterSurfaceT = 1e9;
+    if (hitWaterSphere) {
+        waterSurfaceT = cameraUnderwater ? tWater1 : tWater0;
+    }
+
     if (hitsPlanetShell && tPlanet1 > 0.0) {
         float entry = max(tPlanet0, 0.0);
         marchStart = max(marchStart, max(entry - shellPadding, 0.0));
@@ -250,6 +257,7 @@ void main() {
     if (hitWaterSphere) {
         marchStart = max(marchStart, max(tWater0 - shellPadding, 0.0));
         marchEnd = min(marchEnd, tWater1 + shellPadding);
+        marchEnd = min(marchEnd, waterSurfaceT);
     }
 
     vec3 posPlanet = vec3(0.0);
@@ -264,22 +272,20 @@ void main() {
     float waterFlag = -1.0;
     vec3 normalPlanet = normalize(rd);
 
-    if (hit) {
+    bool hitWaterSurface = hitWaterSphere && (!hit || waterSurfaceT < tTerrain);
+
+    if (hitWaterSurface) {
+        posPlanet = ro + rd * waterSurfaceT;
+        normalPlanet = normalize(posPlanet);
+        heightValue = terrainHeight(normalPlanet * planetRadius);
+        baseColor = waterColor;
+        waterFlag = 1.0;
+    } else if (hit) {
         float d0 = planetSDF(posPlanet);
         normalPlanet = computeNormal(posPlanet, d0);
         baseColor = landColor(posPlanet, normalPlanet, heightValue);
         waterFlag = 0.0;
-    }
-
-    bool waterCoversTerrain = hitWaterSphere && (tWater0 < tTerrain) && heightValue <= seaLevel;
-    if (waterCoversTerrain) {
-        vec3 waterSurfacePos = ro + rd * tWater0;
-        posPlanet = waterSurfacePos;
-        normalPlanet = normalize(waterSurfacePos);
-        // Preserve the underlying terrain color so the lighting pass can
-        // treat the water as a transparent volume hovering above it.
-        waterFlag = 1.0;
-    } else if (!hit) {
+    } else {
         posPlanet = ro + rd * marchEnd;
     }
 
@@ -300,10 +306,12 @@ void main() {
     float viewDistance = length(posWorld - camPos);
 
     float waterPath = 0.0;
+    float viewT = hitWaterSurface ? waterSurfaceT : (hit ? tTerrain : marchEnd);
     if (hitWaterSphere) {
-        float waterExit = min(tWater1, viewDistance);
-        if (waterExit > tWater0) {
-            waterPath = waterExit - tWater0;
+        float waterEntry = cameraUnderwater ? 0.0 : tWater0;
+        float waterExit = min(tWater1, viewT);
+        if (waterExit > waterEntry) {
+            waterPath = waterExit - waterEntry;
         }
     }
 

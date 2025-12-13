@@ -56,6 +56,7 @@ _BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS
 CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
 CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
 CLOUD_COVERAGE = 0.44
+CLOUD_WORLD_COVERAGE = 1.0
 CLOUD_DENSITY = 0.45
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
 
@@ -98,6 +99,7 @@ class PlanetParameters:
     cloud_base_altitude: float = CLOUD_BASE_ALTITUDE
     cloud_layer_thickness: float = CLOUD_LAYER_THICKNESS
     cloud_coverage: float = CLOUD_COVERAGE
+    cloud_world_coverage: float = CLOUD_WORLD_COVERAGE
     cloud_density: float = CLOUD_DENSITY
     cloud_light_color: np.ndarray = field(default_factory=lambda: _copy_vector(CLOUD_LIGHT_COLOR))
     planet_max_steps: int = PLANET_MAX_STEPS
@@ -144,6 +146,7 @@ class PlanetParameters:
             cloud_base_altitude=self.cloud_base_altitude,
             cloud_layer_thickness=self.cloud_layer_thickness,
             cloud_coverage=self.cloud_coverage,
+            cloud_world_coverage=self.cloud_world_coverage,
             cloud_density=self.cloud_density,
             cloud_light_color=_copy_vector(self.cloud_light_color),
             planet_max_steps=self.planet_max_steps,

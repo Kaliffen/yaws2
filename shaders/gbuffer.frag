@@ -32,6 +32,7 @@ uniform float timeSeconds;
 // Water Parameters
 uniform vec3 waterColor;
 uniform float cloudCoverage;
+uniform float cloudWorldCoverage;
 
 // Helpers
 float hash(vec3 p) {
@@ -75,6 +76,7 @@ float cloudCoverageField(vec3 dir) {
     float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
     float coverage = bands * 0.65 + streaks * 0.45;
     coverage = coverage * cloudCoverage + 0.12;
+    coverage *= cloudWorldCoverage;
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
 }
 

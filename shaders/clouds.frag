@@ -20,6 +20,7 @@ uniform float cloudBaseAltitude;
 uniform float cloudLayerThickness;
 uniform float cloudCoverage;
 uniform float cloudDensity;
+uniform float cloudWorldCoverage;
 uniform vec3 cloudLightColor;
 uniform float maxRayDistance;
 uniform float aspect;
@@ -106,6 +107,7 @@ float cloudCoverageField(vec3 dir) {
     float billow = 1.0 - abs(fbm(lookup * 1.9 + vec3(-2.0, 3.1, 0.5)) * 2.0 - 1.0);
     float coverage = mix(base, billow, 0.55);
     coverage = coverage * (cloudCoverage + 0.35) + 0.15;
+    coverage *= cloudWorldCoverage;
     return clamp(smoothstep(0.28, 0.68, coverage), 0.0, 1.0);
 }
 

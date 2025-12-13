@@ -27,11 +27,12 @@ def _rotation_matrix(axis: np.ndarray, angle_rad: float) -> np.ndarray:
 
 
 class FPSCamera:
-    def __init__(self, position, yaw, pitch):
+    def __init__(self, position, yaw, pitch, fov_degrees: float = 70.0):
         self.position = position.astype(np.float32)
         self.yaw = yaw
         self.pitch = pitch
         self.roll = 0.0
+        self.fov_degrees = fov_degrees
         self.front = np.array([0.0, 0.0, -1.0], dtype=np.float32)
         self.right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         self.up = np.array([0.0, 1.0, 0.0], dtype=np.float32)

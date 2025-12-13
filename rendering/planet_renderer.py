@@ -34,6 +34,7 @@ class PlanetRenderer:
         self.cam_forward = None
         self.cam_right = None
         self.cam_up = None
+        self.tan_half_fov = np.tan(np.deg2rad(70.0) * 0.5)
         self.spin_angle_deg = 0.0
         self.seasonal_tilt_deg = 0.0
         self.planet_to_world = np.identity(3, dtype=np.float32)
@@ -117,6 +118,7 @@ class PlanetRenderer:
         set_vec3(program, "cloudLightColor", self.parameters.cloud_light_color)
         set_vec2(program, "resolution", (width, height))
         set_float(program, "aspect", float(width) / float(height))
+        set_float(program, "tanHalfFov", self.tan_half_fov)
         set_float(program, "timeSeconds", self.time_seconds)
 
         set_vec3(program, "waterColor", self.parameters.water_color)
@@ -171,11 +173,12 @@ class PlanetRenderer:
             "clamped_radius": clamped_radius,
         }
 
-    def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, calendar_state):
+    def render(self, cam_pos, cam_front, cam_right, cam_up, cam_fov_degrees, width, height, debug_level, calendar_state):
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
         self.cam_up = cam_up
+        self.tan_half_fov = np.tan(np.deg2rad(cam_fov_degrees) * 0.5)
         self.time_seconds = calendar_state.elapsed_seconds
         self._update_rotation_matrices()
         self._update_sun_direction(calendar_state.day_fraction, calendar_state.year_fraction)

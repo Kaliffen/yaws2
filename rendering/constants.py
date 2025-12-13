@@ -26,16 +26,16 @@ CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges. Values around
-# 10 km give a comfortable spread between continental shelves, rolling plains,
-# and alpine peaks.
-HEIGHT_SCALE = 10.5 * SCALAR
+# exaggerated features, but still allow visible mountain ranges. A slightly
+# taller 13 km envelope gives us deeper ocean basins once sea level is lifted
+# while leaving enough headroom for alpine peaks.
+HEIGHT_SCALE = 13.0 * SCALAR
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional
-# multiplier so the shader math stays consistent. A small positive offset keeps
-# shallow coastlines without burying continents.
-SEA_LEVEL = 0.0  # kilometers above the planet radius
+# multiplier so the shader math stays consistent. Raising sea level a bit floods
+# shallow basins so continents read as larger connected landmasses.
+SEA_LEVEL = 1.8  # kilometers above the planet radius
 # Slightly brighter water with a touch more scattering makes oceans stand out
 # against land.
 WATER_COLOR = np.array([0.02, 0.16, 0.24], dtype=np.float32)

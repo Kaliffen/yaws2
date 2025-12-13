@@ -113,8 +113,8 @@ float cloudCoverageField(vec3 dir) {
 float terrainHeight(vec3 p) {
     vec3 scaledP = p / planetRadius;
 
-    float warpFreq = 1.1;
-    float warpAmp = 0.08;
+    float warpFreq = 0.95;
+    float warpAmp = 0.1;
 
     vec3 warp = vec3(
         fbm(scaledP * warpFreq + vec3(11.7)),
@@ -123,8 +123,8 @@ float terrainHeight(vec3 p) {
     );
 
     vec3 macroWarp = (warp - 0.5) * 2.0 * warpAmp;
-    vec3 continentP = scaledP * 0.6 + macroWarp * 0.35;
-    vec3 warpedP = scaledP * 6.5 + macroWarp;
+    vec3 continentP = scaledP * 0.5 + macroWarp * 0.45;
+    vec3 warpedP = scaledP * 6.2 + macroWarp;
 
     float continents = ridgedFbm(continentP);
     continents = pow(continents, 1.35);
@@ -135,7 +135,7 @@ float terrainHeight(vec3 p) {
     float normalized = continents * 0.62 + mid * 0.28 + detail * 0.1;
     // Bias the terrain downward so ocean basins form wide bodies of water while
     // still leaving ample headroom for tall mountain ranges.
-    return (normalized - 0.48) * heightScale;
+    return (normalized - 0.55) * heightScale;
 }
 
 float planetSDF(vec3 p) {

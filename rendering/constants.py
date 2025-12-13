@@ -26,8 +26,10 @@ CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 432.2 * SCALAR
+# exaggerated features, but still allow visible mountain ranges. Values around
+# 10 km give a comfortable spread between continental shelves, rolling plains,
+# and alpine peaks.
+HEIGHT_SCALE = 10.5 * SCALAR
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional

@@ -7,7 +7,7 @@ import numpy as np
 from gl_utils.program import create_compute_program, create_program
 from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera, normalize, WORLD_UP
-from rendering.constants import PlanetParameters, default_planet_parameters
+from rendering.constants import PlanetParameters, default_planet_parameters, SCALAR
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer, PlanetCalendar
 
@@ -297,7 +297,7 @@ def main():
     )
     # Start with a modest base speed so surface traversal feels grounded. Speed
     # ramps up automatically as you get farther from the planet.
-    base_speed = 60.0
+    base_speed = 60.0 * SCALAR
     camera.speed = base_speed
     camera.min_radius = None
 

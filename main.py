@@ -110,10 +110,10 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude:.2f} m")
     imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness:.2f} m")
     _, editing_params.height_scale = imgui.input_float(
-        "Height scale (m)", editing_params.height_scale, step=500.0, step_fast=2_500.0
+        "Height scale (m)", editing_params.height_scale, step=10_000.0, step_fast=50_000.0
     )
     _, editing_params.sea_level = imgui.input_float(
-        "Sea level offset (m)", editing_params.sea_level, step=10.0, step_fast=50.0
+        "Sea level offset (m)", editing_params.sea_level, step=1_000.0, step_fast=5_000.0
     )
 
     changed, water_color = imgui.input_float3("Water color", *editing_params.water_color)

@@ -7,28 +7,28 @@ SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 SUN_POWER = 1.5
 
 # Base scale values for the planet and atmosphere (meters)
-# Use Earth scale values so curvature, horizon distance, and atmosphere thickness
-# align with real-world expectations.
+# Directly convert the previous kilometer defaults to meters so the scene
+# preserves its proportions while matching SI units.
 PLANET_RADIUS = 6_371_000.0
 
 # Express atmospheric and cloud heights as percentages of the planet radius
-# or atmosphere thickness so they automatically scale. A ~1.6% shell places the
-# top of the atmosphere near 100 km, and the cloud band sits a few kilometers
-# above the surface.
-ATMOSPHERE_THICKNESS_PERCENT = 1.6
+# or atmosphere thickness so they automatically scale. These mirror the prior
+# kilometer-based defaults but expressed in meters so the visual balance
+# (thicker atmosphere and high cloud banks) matches the old look.
+ATMOSPHERE_THICKNESS_PERCENT = 4.0
 ATMOSPHERE_THICKNESS_RATIO = ATMOSPHERE_THICKNESS_PERCENT / 100.0
 _BASELINE_ATMOSPHERE_THICKNESS = PLANET_RADIUS * ATMOSPHERE_THICKNESS_RATIO
-CLOUD_BASE_PERCENT = 2.0
-CLOUD_LAYER_THICKNESS_PERCENT = 3.0
+CLOUD_BASE_PERCENT = 45.0
+CLOUD_LAYER_THICKNESS_PERCENT = 35.0
 CLOUD_BASE_ALTITUDE_RATIO = CLOUD_BASE_PERCENT / 100.0
 CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 
 ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
-# Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges (on the order of
-# Everest's height).
-HEIGHT_SCALE = 9000.0
+# Keep terrain displacement consistent with the prior world: convert the
+# kilometer height range directly to meters so mountains and continents retain
+# their prominence.
+HEIGHT_SCALE = 532_200.0
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional

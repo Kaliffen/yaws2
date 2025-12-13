@@ -265,6 +265,8 @@ def main():
 
     with open("shaders/planet.vert") as f:
         vert_src = f.read()
+    with open("shaders/planet_common.glsl") as f:
+        common_src = f.read()
     with open("shaders/gbuffer.frag") as f:
         gbuffer_src = f.read()
     with open("shaders/lighting.frag") as f:
@@ -277,6 +279,12 @@ def main():
         composite_src = f.read()
     with open("shaders/surface_info.comp") as f:
         surface_info_src = f.read()
+
+    def inject_common(source: str) -> str:
+        return source.replace('#include "planet_common.glsl"', common_src)
+
+    gbuffer_src = inject_common(gbuffer_src)
+    surface_info_src = inject_common(surface_info_src)
 
     gbuffer_program = create_program(vert_src, gbuffer_src)
     lighting_program = create_program(vert_src, lighting_src)

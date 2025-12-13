@@ -1,5 +1,7 @@
 #version 410 core
 
+#include "planet_common.glsl"
+
 out vec4 gPositionHeight;   // xyz = world position of first hit, w = terrain height
 out vec4 gNormalFlags;      // xyz = normal, w = water coverage (1 water, 0 land, -1 no hit)
 out vec4 gMaterial;         // rgb = albedo, a = cloud density placeholder
@@ -30,79 +32,12 @@ uniform mat3 worldToPlanet;
 uniform vec3 waterColor;
 uniform float cloudCoverage;
 
-// Helpers
-float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1));
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-
-float noise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    float n000 = hash(i + vec3(0,0,0));
-    float n001 = hash(i + vec3(0,0,1));
-    float n010 = hash(i + vec3(0,1,0));
-    float n011 = hash(i + vec3(0,1,1));
-    float n100 = hash(i + vec3(1,0,0));
-    float n101 = hash(i + vec3(1,0,1));
-    float n110 = hash(i + vec3(1,1,0));
-    float n111 = hash(i + vec3(1,1,1));
-    vec3 u = f*f*(3.0 - 2.0*f);
-    return mix(
-        mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-        mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
-        u.z
-    );
-}
-
-float fbm(vec3 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 5; i++) {
-        v += a * noise(p);
-        p *= 2.0;
-        a *= 0.5;
-    }
-    return v;
-}
-
 float cloudCoverageField(vec3 dir) {
     float bands = fbm(dir * 3.1 + vec3(1.7, -2.2, 0.5));
     float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
     float coverage = bands * 0.65 + streaks * 0.45;
     coverage = coverage * cloudCoverage + 0.12;
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
-}
-
-// Terrain Height and SDF
-float terrainHeight(vec3 p) {
-    vec3 scaledP = p / planetRadius;
-
-    float warpFreq = 1.15;
-    float warpAmp = 0.06;
-
-    vec3 warp = vec3(
-        fbm(scaledP * warpFreq + vec3(11.7)),
-        fbm(scaledP * warpFreq + vec3(3.9, 17.2, 5.1)),
-        fbm(scaledP * warpFreq - vec3(7.5))
-    );
-
-    vec3 warpedP = scaledP * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
-
-    float base = fbm(warpedP);
-    float detail = fbm(warpedP * 2.5) * 0.35;
-
-    float normalized = base * 0.62 + detail * 0.38;
-    // Bias the terrain downward so a portion of the surface sits below sea level,
-    // revealing oceans instead of an all-land sphere.
-    return (normalized - 0.42) * heightScale;
-}
-
-float planetSDF(vec3 p) {
-    float r = length(p);
-    float h = terrainHeight(p);
-    return r - (planetRadius + h);
 }
 
 vec3 rayDirection(vec2 uv) {
@@ -116,7 +51,7 @@ bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     for (int i = 0; i < 1024; i++) {
         if (i >= planetMaxSteps) break;
         vec3 p = ro + rd * t;
-        float d = planetSDF(p);
+        float d = planetSDF(p, planetRadius, heightScale);
         if (d < eps) {
             pos = p;
             return true;
@@ -125,14 +60,6 @@ bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
         if (t > maxRayDistance) break;
     }
     return false;
-}
-
-vec3 computeNormal(vec3 p, float d0) {
-    float eps = max(planetRadius * 0.0005, heightScale * 0.03);
-    float dx = planetSDF(p + vec3(eps,0,0)) - d0;
-    float dy = planetSDF(p + vec3(0,eps,0)) - d0;
-    float dz = planetSDF(p + vec3(0,0,eps)) - d0;
-    return normalize(vec3(dx, dy, dz));
 }
 
 bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
@@ -201,15 +128,15 @@ void main() {
     if (hitWaterSphere && t0 < 0.0) t0 = 0.0;
 
     float tTerrain = hit ? t : 1e9;
-    float heightValue = hit ? terrainHeight(posPlanet) : -1.0;
+    float heightValue = hit ? terrainHeight(posPlanet, planetRadius, heightScale) : -1.0;
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
     float waterFlag = -1.0;
     vec3 normalPlanet = normalize(rd);
 
     if (hit) {
-        float d0 = planetSDF(posPlanet);
-        normalPlanet = computeNormal(posPlanet, d0);
+        float d0 = planetSDF(posPlanet, planetRadius, heightScale);
+        normalPlanet = computeNormal(posPlanet, d0, planetRadius, heightScale);
         baseColor = landColor(posPlanet, normalPlanet, heightValue);
         waterFlag = 0.0;
     }

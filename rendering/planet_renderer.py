@@ -158,6 +158,7 @@ class PlanetRenderer:
         altitude = float(data[4])
         terrain_height = float(data[5])
         clamped_radius = float(data[6])
+        water_flag = float(data[7])
 
         return {
             "normal": normal,
@@ -165,6 +166,7 @@ class PlanetRenderer:
             "terrain_height": terrain_height,
             "altitude": altitude,
             "clamped_radius": clamped_radius,
+            "water": water_flag > 0.5,
         }
 
     def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, calendar_state):

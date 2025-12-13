@@ -355,6 +355,11 @@ def main():
         if gravity_enabled and in_atmosphere and is_grounded:
             camera.position = spin_delta @ camera.position
             camera.velocity = spin_delta @ camera.velocity
+            camera.front = normalize(spin_delta @ camera.front)
+            camera.right = normalize(spin_delta @ camera.right)
+            camera.up = normalize(spin_delta @ camera.up)
+            camera.yaw = np.degrees(np.arctan2(camera.front[2], camera.front[0]))
+            camera.pitch = np.degrees(np.arcsin(np.clip(camera.front[1], -1.0, 1.0)))
             surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
 
         if gravity_enabled and in_atmosphere and surface_info is not None:

@@ -96,7 +96,7 @@ class FPSCamera:
         self.up = normalize(roll_rotation @ base_up)
 
     def process_mouse(self, xoff, yoff):
-        roll_rad = np.radians(self.roll)
+        roll_rad = np.radians(-self.roll)
         cos_r = np.cos(roll_rad)
         sin_r = np.sin(roll_rad)
 

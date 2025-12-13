@@ -4,7 +4,7 @@ import numpy as np
 
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
-SUN_POWER = 1.5
+SUN_POWER = 2.4
 SCALAR = 1.0
 # Base scale values for the planet and atmosphere (kilometers)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct

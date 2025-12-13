@@ -5,6 +5,7 @@ from gl_utils.buffers import create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
 from utils.time import compute_sun_direction
 from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
+from rendering.noise import generate_value_noise_3d, upload_value_noise_volume
 
 
 class PlanetRenderer:
@@ -40,6 +41,10 @@ class PlanetRenderer:
         self.world_to_planet = np.identity(3, dtype=np.float32)
         self.time_seconds = 0.0
         self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
+        self.terrain_noise_tex = None
+        self.terrain_noise_size = 0
+
+        self._create_terrain_noise()
 
     def _ensure_surface_info_buffer(self):
         if self.surface_info_buffer is not None:
@@ -77,6 +82,19 @@ class PlanetRenderer:
 
     def _update_sun_direction(self, day_fraction: float, year_fraction: float) -> None:
         self.sun_direction = compute_sun_direction(day_fraction, year_fraction, self.parameters.tilt_degrees)
+
+    def _create_terrain_noise(self, size: int = 96) -> None:
+        if self.terrain_noise_tex is not None:
+            return
+
+        noise_volume = generate_value_noise_3d(size)
+        self.terrain_noise_tex = upload_value_noise_volume(noise_volume)
+        self.terrain_noise_size = size
+
+    def _bind_terrain_noise(self, program, texture_unit: int = 0) -> None:
+        glActiveTexture(GL_TEXTURE0 + texture_unit)
+        glBindTexture(GL_TEXTURE_3D, self.terrain_noise_tex)
+        set_int(program, "terrainNoise", texture_unit)
 
     def _ensure_gbuffer(self, width, height):
         if self.gbuffer and self.gbuffer["width"] == width and self.gbuffer["height"] == height:
@@ -124,6 +142,7 @@ class PlanetRenderer:
         set_float(program, "waterScattering", self.parameters.water_scattering)
         set_mat3(program, "planetToWorld", self.planet_to_world)
         set_mat3(program, "worldToPlanet", self.world_to_planet)
+        set_float(program, "terrainNoiseSize", float(self.terrain_noise_size))
 
     def prepare_frame_state(self, calendar_state):
         self.time_seconds = calendar_state.elapsed_seconds
@@ -147,6 +166,8 @@ class PlanetRenderer:
         set_float(self.surface_info_program, "seaLevel", self.parameters.sea_level)
         set_mat3(self.surface_info_program, "worldToPlanet", self.world_to_planet)
         set_float(self.surface_info_program, "minAltitudeOffset", float(min_altitude_offset))
+        set_float(self.surface_info_program, "terrainNoiseSize", float(self.terrain_noise_size))
+        self._bind_terrain_noise(self.surface_info_program)
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, self.surface_info_buffer)
         glDispatchCompute(1, 1, 1)
@@ -190,6 +211,7 @@ class PlanetRenderer:
 
         glUseProgram(self.gbuffer_program)
         self._bind_common_uniforms(self.gbuffer_program, width, height)
+        self._bind_terrain_noise(self.gbuffer_program)
         set_int(self.gbuffer_program, "planetMaxSteps", self.parameters.planet_max_steps)
         set_float(self.gbuffer_program, "planetStepScale", self.parameters.planet_step_scale)
         set_float(self.gbuffer_program, "planetMinStepFactor", self.parameters.planet_min_step_factor)

@@ -27,35 +27,20 @@ uniform vec2 resolution;
 uniform mat3 planetToWorld;
 uniform mat3 worldToPlanet;
 uniform float timeSeconds;
+uniform sampler3D terrainNoise;
+uniform float terrainNoiseSize;
 
 // Water Parameters
 uniform vec3 waterColor;
 uniform float cloudCoverage;
 
 // Helpers
-float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1));
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-
 float noise(vec3 p) {
-    vec3 i = floor(p);
+    vec3 cell = floor(p);
     vec3 f = fract(p);
-    float n000 = hash(i + vec3(0,0,0));
-    float n001 = hash(i + vec3(0,0,1));
-    float n010 = hash(i + vec3(0,1,0));
-    float n011 = hash(i + vec3(0,1,1));
-    float n100 = hash(i + vec3(1,0,0));
-    float n101 = hash(i + vec3(1,0,1));
-    float n110 = hash(i + vec3(1,1,0));
-    float n111 = hash(i + vec3(1,1,1));
-    vec3 u = f*f*(3.0 - 2.0*f);
-    return mix(
-        mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-        mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
-        u.z
-    );
+    vec3 wrappedCell = mod(cell, terrainNoiseSize);
+    vec3 coord = (wrappedCell + f) / terrainNoiseSize;
+    return texture(terrainNoise, coord).r;
 }
 
 float fbm(vec3 p) {

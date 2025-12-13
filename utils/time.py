@@ -39,6 +39,16 @@ class PlanetCalendar:
         self.elapsed_seconds = (self.elapsed_seconds + dt * time_speed) % self.seconds_per_year
         return self._state_from_elapsed()
 
+    def set_time(self, day_index: int, hour: int, minute: int, second: int) -> CalendarState:
+        day_index = max(0, min(self.days_in_year - 1, day_index))
+        hour = max(0, min(self.hours_per_day - 1, hour))
+        minute = max(0, min(59, minute))
+        second = max(0, min(59, second))
+
+        seconds_into_day = hour * 3600 + minute * 60 + second
+        self.elapsed_seconds = (day_index * self.seconds_per_day + seconds_into_day) % self.seconds_per_year
+        return self._state_from_elapsed()
+
     def _state_from_elapsed(self) -> CalendarState:
         total_seconds = self.elapsed_seconds
         day_index = int(total_seconds // self.seconds_per_day)

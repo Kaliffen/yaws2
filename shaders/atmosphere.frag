@@ -19,6 +19,13 @@ uniform float atmosphereRadius;
 uniform float aspect;
 uniform mat3 worldToPlanet;
 
+const float PI = 3.14159265359;
+const float RAYLEIGH_SCALE_HEIGHT = 8000.0;
+const float MIE_SCALE_HEIGHT = 1200.0;
+const float HG_G = 0.76;
+const vec3 BETA_RAYLEIGH = vec3(5.8e-6, 13.5e-6, 33.1e-6);
+const vec3 BETA_MIE = vec3(2.1e-5);
+
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
 }
@@ -31,88 +38,108 @@ vec3 decodeViewData(vec2 uv) {
     return texture(gViewData, uv).xyz;
 }
 
-vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
-    float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
-
-    // Transition from a cool night hue to a tighter, warmer daylight band.
-    float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
-    float goldenBand = 1.0 - smoothstep(0.01, 0.17, abs(sunHeight));
-
-    vec3 nightColor = vec3(0.02, 0.06, 0.12);
-    vec3 dayColor = vec3(0.26, 0.48, 0.70);
-    vec3 goldenColor = vec3(0.98, 0.62, 0.36);
-    vec3 twilightColor = vec3(0.30, 0.24, 0.46);
-
-    vec3 warmBlend = mix(dayColor, goldenColor, goldenBand * 2.35);
-    vec3 base = mix(nightColor, warmBlend, dayFactor);
-    return mix(base, twilightColor, goldenBand * 0.18);
+float rayleighPhase(float cosTheta) {
+    return (3.0 / (16.0 * PI)) * (1.0 + cosTheta * cosTheta);
 }
 
-vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface, vec2 segment) {
+float hgPhase(float cosTheta) {
+    float g2 = HG_G * HG_G;
+    float denom = pow(1.0 + g2 - 2.0 * HG_G * cosTheta, 1.5);
+    return (3.0 / (8.0 * PI)) * (1.0 - g2) * (1.0 + cosTheta * cosTheta) / (denom * (2.0 + g2));
+}
+
+bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
+    float b = dot(ro, rd);
+    float c = dot(ro, ro) - R * R;
+    float h = b * b - c;
+    if (h < 0.0) return false;
+    h = sqrt(h);
+    t0 = -b - h;
+    t1 = -b + h;
+    return true;
+}
+
+vec3 integrateSunTransmittance(vec3 start, vec3 lightDir) {
+    float t0, t1;
+    if (!intersectSphere(start, lightDir, atmosphereRadius, t0, t1)) {
+        return vec3(1.0);
+    }
+
+    float begin = max(t0, 0.0);
+    float end = t1;
+    const int SUN_STEPS = 8;
+    float stepSize = (end - begin) / float(SUN_STEPS);
+
+    float rayleighOD = 0.0;
+    float mieOD = 0.0;
+    for (int i = 0; i < SUN_STEPS; i++) {
+        float t = begin + (float(i) + 0.5) * stepSize;
+        vec3 samplePos = start + lightDir * t;
+        float height = max(length(samplePos) - planetRadius, 0.0);
+        rayleighOD += exp(-height / RAYLEIGH_SCALE_HEIGHT) * stepSize;
+        mieOD += exp(-height / MIE_SCALE_HEIGHT) * stepSize;
+    }
+
+    return exp(-(BETA_RAYLEIGH * rayleighOD + BETA_MIE * mieOD));
+}
+
+vec4 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec2 segment) {
     float pathLength = segment.y - segment.x;
-    float viewHeight = max(length(rayOrigin) - planetRadius, 0.0);
-    float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
-    float altitudeNorm = clamp(viewHeight / atmThickness, 0.0, 1.0);
-    float altitudeFalloff = mix(1.0, 0.25, altitudeNorm * altitudeNorm);
+    if (pathLength <= 0.0) {
+        return vec4(0.0);
+    }
 
     vec3 lightDir = normalize(worldToPlanet * sunDir);
-    float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
-    float sunVisibility = smoothstep(-0.08, 0.12, sunFacing);
+    float cosTheta = dot(rayDir, lightDir);
+    float phaseR = rayleighPhase(cosTheta);
+    float phaseM = hgPhase(cosTheta);
 
-    float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
+    const int VIEW_STEPS = 28;
+    float start = max(segment.x, 0.0);
+    float stepSize = pathLength / float(VIEW_STEPS);
 
-    // The previous approach weighted the scattering almost entirely toward the
-    // horizon, which made rays that travel up through the atmosphere (toward
-    // space) contribute almost nothing. The result was a harsh black band near
-    // the top of the sky because the "horizonFactor" fell to zero when
-    // horizonDot approached 1. To keep a soft sky even at steep angles, keep a
-    // small baseline of scattering that grows toward the horizon. A second
-    // issue: short atmosphere segments (at high altitude or near-grazing views)
-    // had their scatter almost fully erased by the path-factor ramp, so add a
-    // lift that keeps thin air lightly visible.
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
-    float zenithLift = mix(0.12, 0.24, sunVisibility) * (1.0 - altitudeNorm * 0.55);
-    float thinPathLift = mix(0.18, 0.06, altitudeNorm)
-        * (1.0 - smoothstep(0.02 * atmThickness, 0.18 * atmThickness, pathLength));
-    float scatterSpread = max(horizonFactor + zenithLift * 0.6, zenithLift);
-    scatterSpread = max(scatterSpread, thinPathLift);
-    float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0) * sunVisibility;
+    vec2 opticalDepth = vec2(0.0);
+    vec3 scattered = vec3(0.0);
 
-    float pathFactor = smoothstep(0.0, atmThickness, pathLength);
-    float density = (0.32 + 0.55 * (1.0 - altitudeNorm)) * max(pathFactor, 0.12);
+    for (int i = 0; i < VIEW_STEPS; i++) {
+        float t = start + (float(i) + 0.5) * stepSize;
+        vec3 samplePos = rayOrigin + rayDir * t;
+        float height = max(length(samplePos) - planetRadius, 0.0);
+        float localRayleigh = exp(-height / RAYLEIGH_SCALE_HEIGHT);
+        float localMie = exp(-height / MIE_SCALE_HEIGHT);
 
-    float scatter = scatterSpread * altitudeFalloff * density * sunVisibility * 1.12;
-    scatter += mieForward * 0.06;
+        vec2 stepOD = vec2(localRayleigh, localMie) * stepSize;
+        opticalDepth += stepOD;
 
-    vec3 sunTint = computeSunTint(normalize(rayOrigin), lightDir);
-    float twilightBlend = smoothstep(-0.32, 0.06, sunFacing) * (1.0 - sunVisibility);
-    vec3 twilightTint = mix(vec3(0.16, 0.18, 0.30), vec3(0.30, 0.24, 0.46), twilightBlend);
-    vec3 horizonTint = mix(sunTint, twilightTint, clamp(1.0 - sunVisibility, 0.0, 1.0));
-    vec3 highAltTint = mix(vec3(0.08, 0.12, 0.18), vec3(0.18, 0.26, 0.36), horizonFactor);
-    vec3 atmosphereColor = mix(highAltTint, horizonTint, clamp(0.28 + horizonFactor, 0.0, 1.0));
+        vec3 transView = exp(-(BETA_RAYLEIGH * opticalDepth.x + BETA_MIE * opticalDepth.y));
+        vec3 transSun = integrateSunTransmittance(samplePos, lightDir);
+
+        vec3 scatterCoeff = localRayleigh * BETA_RAYLEIGH * phaseR + localMie * BETA_MIE * phaseM;
+        scattered += scatterCoeff * transSun * transView * stepSize;
+    }
+
     float sunIntensity = max(sunPower, 0.0);
-    return atmosphereColor * scatter * sunIntensity;
+    scattered *= sunIntensity;
+
+    vec3 transmittanceRGB = exp(-(BETA_RAYLEIGH * opticalDepth.x + BETA_MIE * opticalDepth.y));
+    float transmittance = clamp((transmittanceRGB.r + transmittanceRGB.g + transmittanceRGB.b) / 3.0, 0.0, 1.0);
+
+    return vec4(scattered, transmittance);
 }
 
 void main() {
     vec2 uv = TexCoord;
 
     vec3 pos = decodePosition(uv);
-    vec4 normalFlags = decodeNormalFlags(uv);
-    bool hit = normalFlags.w > -0.5;
     vec3 viewData = decodeViewData(uv);
 
     vec3 camPlanet = worldToPlanet * camPos;
-    vec3 posPlanet = worldToPlanet * pos;
     vec3 viewDirWorld = normalize(pos - camPos);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
     vec2 atmosphereSegment = viewData.yz;
-    vec3 atmosphere = (atmosphereSegment.y > atmosphereSegment.x)
-        ? computeAtmosphere(camPlanet, viewDirPlanet, posPlanet, hit, atmosphereSegment)
-        : vec3(0.0);
+    vec4 atmosphere = (atmosphereSegment.y > atmosphereSegment.x)
+        ? computeAtmosphere(camPlanet, viewDirPlanet, atmosphereSegment)
+        : vec4(0.0);
 
-    float opticalDepth = length(atmosphere);
-    float transmittance = exp(-opticalDepth * 0.55);
-
-    FragColor = vec4(atmosphere, clamp(transmittance, 0.0, 1.0));
+    FragColor = atmosphere;
 }

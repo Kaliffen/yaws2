@@ -7,6 +7,7 @@ in vec2 TexCoord;
 uniform sampler2D gPositionHeight;
 uniform sampler2D gNormalFlags;
 uniform sampler2D gMaterial;
+uniform sampler2D gViewData;
 
 uniform vec3 camPos;
 uniform vec3 sunDir;
@@ -33,19 +34,8 @@ vec3 decodeAlbedo(vec2 uv) {
     return texture(gMaterial, uv).rgb;
 }
 
-bool intersectSphere(vec3 ro, vec3 rd, float radius, out float t0, out float t1) {
-    float b = dot(ro, rd);
-    float c = dot(ro, ro) - radius * radius;
-    float discriminant = b * b - c;
-
-    if (discriminant < 0.0) {
-        return false;
-    }
-
-    float s = sqrt(discriminant);
-    t0 = -b - s;
-    t1 = -b + s;
-    return true;
+vec4 decodeViewData(vec2 uv) {
+    return texture(gViewData, uv);
 }
 
 vec3 computeSunTint(vec3 position, vec3 lightDir) {
@@ -123,6 +113,7 @@ void main() {
     vec3 normal = normalize(normalFlags.xyz);
     float waterFlag = normalFlags.w;
     vec3 albedo = decodeAlbedo(uv);
+    vec4 viewData = decodeViewData(uv);
 
     bool hit = waterFlag > -0.5;
 
@@ -151,21 +142,10 @@ void main() {
 
     float shadow = hit ? computeShadow(pos, normal) : 0.0;
 
+    float distToPos = viewData.x;
     vec3 toPos = pos - camPos;
-    float distToPos = length(toPos);
     vec3 viewDir2 = distToPos > 0.0 ? toPos / distToPos : vec3(0.0, 0.0, 1.0);
-
-    float t0, t1;
-    float waterRadius = planetRadius + seaLevel;
-    bool throughWater = intersectSphere(camPos, viewDir2, waterRadius, t0, t1);
-    float waterPath = 0.0;
-    if (throughWater && t1 > 0.0) {
-        if (t0 < 0.0) t0 = 0.0;
-        float exitT = min(t1, distToPos);
-        if (exitT > t0) {
-            waterPath = exitT - t0;
-        }
-    }
+    float waterPath = max(viewData.w, 0.0);
 
     float waterDepth = (waterFlag > 0.5) ? max(seaLevel - heightValue, 0.0) : 0.0;
     vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth, waterPath, effectiveSunColor, shadow, ambient);

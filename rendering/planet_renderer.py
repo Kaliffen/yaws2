@@ -216,6 +216,10 @@ class PlanetRenderer:
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["material"])
         set_int(self.lighting_program, "gMaterial", 2)
 
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, self.gbuffer["view_data"])
+        set_int(self.lighting_program, "gViewData", 3)
+
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
         # Pass 3: atmosphere
@@ -233,6 +237,10 @@ class PlanetRenderer:
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["normal"])
         set_int(self.atmosphere_program, "gNormalFlags", 1)
+
+        glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, self.gbuffer["view_data"])
+        set_int(self.atmosphere_program, "gViewData", 2)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
@@ -258,6 +266,10 @@ class PlanetRenderer:
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["material"])
         set_int(self.cloud_program, "gMaterial", 2)
+
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, self.gbuffer["view_data"])
+        set_int(self.cloud_program, "gViewData", 3)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
@@ -292,6 +304,10 @@ class PlanetRenderer:
         glActiveTexture(GL_TEXTURE5)
         glBindTexture(GL_TEXTURE_2D, self.cloud_buffer["textures"][0])
         set_int(self.composite_program, "cloudTex", 5)
+
+        glActiveTexture(GL_TEXTURE6)
+        glBindTexture(GL_TEXTURE_2D, self.gbuffer["view_data"])
+        set_int(self.composite_program, "gViewData", 6)
 
         set_int(self.composite_program, "debugLevel", debug_level)
 

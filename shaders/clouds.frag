@@ -7,6 +7,7 @@ in vec2 TexCoord;
 uniform sampler2D gPositionHeight;
 uniform sampler2D gNormalFlags;
 uniform sampler2D gMaterial;
+uniform sampler2D gViewData;
 
 uniform vec3 camPos;
 uniform vec3 camForward;
@@ -233,12 +234,13 @@ void main() {
     vec3 pos = texture(gPositionHeight, uv).xyz;
     vec4 normalFlags = texture(gNormalFlags, uv);
     vec4 material = texture(gMaterial, uv);
+    vec4 viewData = texture(gViewData, uv);
     bool hit = normalFlags.w > -0.5;
 
     vec3 camPlanet = worldToPlanet * camPos;
     vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
-    float surfaceDistance = hit ? length(pos - camPos) : maxRayDistance;
+    float surfaceDistance = viewData.x;
     vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a);
 
     FragColor = clouds;

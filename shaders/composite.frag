@@ -7,6 +7,7 @@ in vec2 TexCoord;
 uniform sampler2D gPositionHeight;
 uniform sampler2D gNormalFlags;
 uniform sampler2D gMaterial;
+uniform sampler2D gViewData;
 uniform sampler2D lightingTex;
 uniform sampler2D atmosphereTex;
 uniform sampler2D cloudTex;
@@ -43,6 +44,10 @@ vec4 decodeMaterial(vec2 uv) {
     return texture(gMaterial, uv);
 }
 
+float decodeViewDistance(vec2 uv) {
+    return texture(gViewData, uv).x;
+}
+
 void main() {
     vec2 uv = TexCoord;
 
@@ -52,6 +57,7 @@ void main() {
     float waterFlag = normalFlags.w;
     vec4 material = decodeMaterial(uv);
     vec3 albedo = material.rgb;
+    float viewDistance = decodeViewDistance(uv);
 
     bool hit = waterFlag > -0.5;
 
@@ -59,7 +65,7 @@ void main() {
     vec4 atmosphereSample = texture(atmosphereTex, uv);
     vec4 cloudSample = texture(cloudTex, uv);
 
-    float sdfDepth = clamp(length(pos) / maxRayDistance, 0.0, 1.0);
+    float sdfDepth = clamp(viewDistance / maxRayDistance, 0.0, 1.0);
     float heightView = clamp((heightValue + heightScale) / (heightScale * 2.0), 0.0, 1.0);
 
     float shadow = lightingSample.a;

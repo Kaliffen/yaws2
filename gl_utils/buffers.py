@@ -48,13 +48,14 @@ def create_gbuffer(width, height):
     gPositionHeight = create_texture(width, height, GL_COLOR_ATTACHMENT0)
     gNormalFlags = create_texture(width, height, GL_COLOR_ATTACHMENT1)
     gMaterial = create_texture(width, height, GL_COLOR_ATTACHMENT2)
+    gViewData = create_texture(width, height, GL_COLOR_ATTACHMENT3, GL_RGBA32F)
 
     rbo = glGenRenderbuffers(1)
     glBindRenderbuffer(GL_RENDERBUFFER, rbo)
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height)
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo)
 
-    attachments = [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2]
+    attachments = [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3]
     glDrawBuffers(len(attachments), attachments)
 
     if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
@@ -66,6 +67,7 @@ def create_gbuffer(width, height):
         "position": gPositionHeight,
         "normal": gNormalFlags,
         "material": gMaterial,
+        "view_data": gViewData,
         "rbo": rbo,
         "width": width,
         "height": height,

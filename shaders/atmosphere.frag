@@ -66,14 +66,20 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     // space) contribute almost nothing. The result was a harsh black band near
     // the top of the sky because the "horizonFactor" fell to zero when
     // horizonDot approached 1. To keep a soft sky even at steep angles, keep a
-    // small baseline of scattering that grows toward the horizon.
+    // small baseline of scattering that grows toward the horizon. A second
+    // issue: short atmosphere segments (at high altitude or near-grazing views)
+    // had their scatter almost fully erased by the path-factor ramp, so add a
+    // lift that keeps thin air lightly visible.
     float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
-    float zenithLift = mix(0.08, 0.18, sunVisibility) * (1.0 - altitudeNorm * 0.45);
-    float scatterSpread = max(horizonFactor, zenithLift);
+    float zenithLift = mix(0.12, 0.24, sunVisibility) * (1.0 - altitudeNorm * 0.55);
+    float thinPathLift = mix(0.18, 0.06, altitudeNorm)
+        * (1.0 - smoothstep(0.02 * atmThickness, 0.18 * atmThickness, pathLength));
+    float scatterSpread = max(horizonFactor + zenithLift * 0.6, zenithLift);
+    scatterSpread = max(scatterSpread, thinPathLift);
     float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0) * sunVisibility;
 
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
-    float density = (0.28 + 0.55 * (1.0 - altitudeNorm)) * pathFactor;
+    float density = (0.32 + 0.55 * (1.0 - altitudeNorm)) * max(pathFactor, 0.12);
 
     float scatter = scatterSpread * altitudeFalloff * density * sunVisibility * 0.72;
     scatter += mieForward * 0.06;

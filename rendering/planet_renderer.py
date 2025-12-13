@@ -7,17 +7,28 @@ from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
 
 
 class PlanetRenderer:
-    def __init__(self, gbuffer_program, lighting_program, atmosphere_program, cloud_program, composite_program, parameters: PlanetParameters):
+    def __init__(
+        self,
+        gbuffer_program,
+        lighting_program,
+        atmosphere_program,
+        cloud_program,
+        composite_program,
+        surface_info_program,
+        parameters: PlanetParameters,
+    ):
         self.gbuffer_program = gbuffer_program
         self.lighting_program = lighting_program
         self.atmosphere_program = atmosphere_program
         self.cloud_program = cloud_program
         self.composite_program = composite_program
+        self.surface_info_program = surface_info_program
         self.parameters = parameters
         self.gbuffer = None
         self.lighting_buffer = None
         self.atmosphere_buffer = None
         self.cloud_buffer = None
+        self.surface_info_buffer = None
         self.cam_pos = None
         self.cam_forward = None
         self.cam_right = None
@@ -27,6 +38,15 @@ class PlanetRenderer:
         self.planet_to_world = np.identity(3, dtype=np.float32)
         self.world_to_planet = np.identity(3, dtype=np.float32)
         self.time_seconds = 0.0
+
+    def _ensure_surface_info_buffer(self):
+        if self.surface_info_buffer is not None:
+            return
+
+        self.surface_info_buffer = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.surface_info_buffer)
+        glBufferData(GL_SHADER_STORAGE_BUFFER, 8 * 4, None, GL_DYNAMIC_READ)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
 
     def _rotation_matrix_from_axis(self, axis: np.ndarray, angle_rad: float) -> np.ndarray:
         axis = axis / np.linalg.norm(axis)
@@ -103,8 +123,49 @@ class PlanetRenderer:
         set_mat3(program, "planetToWorld", self.planet_to_world)
         set_mat3(program, "worldToPlanet", self.world_to_planet)
 
+    def prepare_frame_state(self, calendar_state):
+        self.time_seconds = calendar_state.elapsed_seconds
+        self._update_rotation_matrices(calendar_state.day_fraction, calendar_state.year_fraction)
+
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
+
+    def query_surface_info(self, query_pos, min_altitude_offset=0.0):
+        if self.surface_info_program is None:
+            return None
+
+        self._ensure_surface_info_buffer()
+
+        glUseProgram(self.surface_info_program)
+        set_vec3(self.surface_info_program, "queryPosition", query_pos)
+        set_float(self.surface_info_program, "planetRadius", self.parameters.planet_radius)
+        set_float(self.surface_info_program, "heightScale", self.parameters.height_scale)
+        set_float(self.surface_info_program, "seaLevel", self.parameters.sea_level)
+        set_mat3(self.surface_info_program, "worldToPlanet", self.world_to_planet)
+        set_float(self.surface_info_program, "minAltitudeOffset", float(min_altitude_offset))
+
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, self.surface_info_buffer)
+        glDispatchCompute(1, 1, 1)
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.surface_info_buffer)
+        raw = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
+
+        data = np.frombuffer(raw, dtype=np.float32)
+        normal = data[0:3]
+        surface_radius = float(data[3])
+        altitude = float(data[4])
+        terrain_height = float(data[5])
+        clamped_radius = float(data[6])
+
+        return {
+            "normal": normal,
+            "surface_radius": surface_radius,
+            "terrain_height": terrain_height,
+            "altitude": altitude,
+            "clamped_radius": clamped_radius,
+        }
 
     def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, calendar_state):
         self.cam_pos = cam_pos

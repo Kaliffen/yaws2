@@ -85,10 +85,12 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
 
     _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
 
-    planet_changed, editing_params.planet_radius = imgui.input_float(
-        "Planet radius (m)", editing_params.planet_radius, step=10.0, step_fast=50.0
+    planet_radius_km = editing_params.planet_radius / 1000.0
+    planet_changed, planet_radius_km = imgui.input_float(
+        "Planet radius (km)", planet_radius_km, step=0.01, step_fast=0.05
     )
     if planet_changed:
+        editing_params.planet_radius = max(planet_radius_km * 1000.0, 0.0)
         editing_params.scale_with_planet_radius()
     atmos_changed, editing_params.atmosphere_thickness_percent = imgui.slider_float(
         "Atmosphere thickness (%)", editing_params.atmosphere_thickness_percent, 0.5, 20.0
@@ -101,15 +103,20 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
     )
     if atmos_changed or cloud_base_changed or cloud_thickness_changed:
         editing_params.scale_with_planet_radius()
-    imgui.text(f"Atmosphere radius: {editing_params.atmosphere_radius:.2f} m")
-    imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude:.2f} m")
-    imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness:.2f} m")
-    _, editing_params.height_scale = imgui.input_float(
-        "Height scale (m)", editing_params.height_scale, step=10.0, step_fast=50.0
+    imgui.text(f"Atmosphere radius: {editing_params.atmosphere_radius / 1000.0:.3f} km")
+    imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude / 1000.0:.3f} km")
+    imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness / 1000.0:.3f} km")
+    height_scale_km = editing_params.height_scale / 1000.0
+    _, height_scale_km = imgui.input_float(
+        "Height scale (km)", height_scale_km, step=0.01, step_fast=0.05
     )
-    _, editing_params.sea_level = imgui.input_float(
-        "Sea level offset (m)", editing_params.sea_level, step=1.0, step_fast=5.0
+    editing_params.height_scale = height_scale_km * 1000.0
+
+    sea_level_km = editing_params.sea_level / 1000.0
+    _, sea_level_km = imgui.input_float(
+        "Sea level offset (km)", sea_level_km, step=0.001, step_fast=0.005
     )
+    editing_params.sea_level = sea_level_km * 1000.0
 
     changed, water_color = imgui.input_float3("Water color", *editing_params.water_color)
     if changed:
@@ -185,9 +192,11 @@ def draw_performance_panel(
     imgui.separator()
 
     imgui.text("Ray distances")
-    _, editing_params.max_ray_distance = imgui.input_float(
-        "Max ray distance", editing_params.max_ray_distance, step=50.0, step_fast=200.0
+    max_ray_distance_km = editing_params.max_ray_distance / 1000.0
+    _, max_ray_distance_km = imgui.input_float(
+        "Max ray distance (km)", max_ray_distance_km, step=0.05, step_fast=0.2
     )
+    editing_params.max_ray_distance = max_ray_distance_km * 1000.0
 
     imgui.separator()
     imgui.text("Planet raymarch")
@@ -219,18 +228,19 @@ def draw_performance_panel(
 
     imgui.separator()
     imgui.text("Player")
-    imgui.text(f"Height above terrain: {player_height:.2f} m")
+    imgui.text(f"Height above terrain: {player_height / 1000.0:.3f} km")
     imgui.same_line()
     imgui.text_disabled("(read-only)")
-    _, min_ground_clearance = imgui.input_float(
-        "Min ground clearance (m)", min_ground_clearance, step=0.01, step_fast=0.1
+    min_ground_clearance_km = min_ground_clearance / 1000.0
+    _, min_ground_clearance_km = imgui.input_float(
+        "Min ground clearance (km)", min_ground_clearance_km, step=0.001, step_fast=0.01
     )
     gravity_clicked = imgui.button("Gravity (G)", width=140)
     imgui.same_line()
     imgui.text("On" if gravity_enabled else "Off")
 
     imgui.end()
-    return gravity_clicked, max(min_ground_clearance, 0.0)
+    return gravity_clicked, max(min_ground_clearance_km * 1000.0, 0.0)
 
 
 def main():

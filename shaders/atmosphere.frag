@@ -56,17 +56,26 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float altitudeFalloff = mix(1.0, 0.25, altitudeNorm * altitudeNorm);
 
     vec3 lightDir = normalize(worldToPlanet * sunDir);
-    float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
-    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
-
     float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
     float sunVisibility = smoothstep(-0.08, 0.12, sunFacing);
+
+    float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
+
+    // The previous approach weighted the scattering almost entirely toward the
+    // horizon, which made rays that travel up through the atmosphere (toward
+    // space) contribute almost nothing. The result was a harsh black band near
+    // the top of the sky because the "horizonFactor" fell to zero when
+    // horizonDot approached 1. To keep a soft sky even at steep angles, keep a
+    // small baseline of scattering that grows toward the horizon.
+    float horizonFactor = pow(clamp(1.0 - abs(horizonDot), 0.0, 1.0), 4.0);
+    float zenithLift = mix(0.08, 0.18, sunVisibility) * (1.0 - altitudeNorm * 0.45);
+    float scatterSpread = max(horizonFactor, zenithLift);
     float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0) * sunVisibility;
 
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
     float density = (0.28 + 0.55 * (1.0 - altitudeNorm)) * pathFactor;
 
-    float scatter = horizonFactor * altitudeFalloff * density * sunVisibility * 0.72;
+    float scatter = scatterSpread * altitudeFalloff * density * sunVisibility * 0.72;
     scatter += mieForward * 0.06;
 
     vec3 sunTint = computeSunTint(normalize(rayOrigin), lightDir);

@@ -92,6 +92,11 @@ mat3 rotationY(float angle) {
     );
 }
 
+float interleavedGradientNoise(vec2 pixel) {
+    float f = dot(pixel, vec2(0.06711056, 0.00583715));
+    return fract(52.9829189 * fract(f));
+}
+
 float cloudCoverageField(vec3 dir) {
     float cloudTime = timeSeconds * cloudAnimationSpeed;
     float swirlAngle = cloudTime * 0.012;
@@ -151,7 +156,12 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
     return true;
 }
 
-vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float coverageHint) {
+float computeDistanceLod(float surfaceDistance) {
+    float normalized = log2(1.0 + surfaceDistance / max(planetRadius, 0.0001));
+    return clamp(normalized * 0.55, 0.0, 1.0);
+}
+
+vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float coverageHint, float distanceLod, float jitter) {
     float baseRadius = planetRadius + cloudBaseAltitude;
     float topRadius = baseRadius + cloudLayerThickness;
 
@@ -177,19 +187,23 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
 
-    float stepSize = (end - start) / max(float(cloudMaxSteps), 1.0);
+    int adaptiveSteps = int(mix(float(cloudMaxSteps), float(cloudMaxSteps) * 0.35, distanceLod));
+    adaptiveSteps = clamp(adaptiveSteps, 4, min(cloudMaxSteps, 256));
+    float stepSize = (end - start) / float(adaptiveSteps);
+    float jitterOffset = jitter - 0.5;
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
     vec3 lightDir = normalize(worldToPlanet * sunDir);
 
     for (int i = 0; i < 256; i++) {
-        if (i >= cloudMaxSteps) break;
-        float t = start + stepSize * (float(i) + 0.5);
+        if (i >= adaptiveSteps) break;
+        float t = start + stepSize * (float(i) + 0.5 + jitterOffset);
         vec3 samplePos = rayOrigin + rayDir * t;
 
         vec3 localNormal = normalize(samplePos);
         float sunHeight = dot(localNormal, lightDir);
         float density = sampleCloudDensity(samplePos, coverageHint) * cloudDensity;
+        density *= mix(1.0, 0.68, distanceLod);
 
         // Thin clouds along grazing angles so the horizon view doesn't look overly
         // opaque. When the view ray is nearly tangent to the planet surface the dot
@@ -241,7 +255,9 @@ void main() {
     vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
     float surfaceDistance = viewData.x;
-    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a);
+    float distanceLod = computeDistanceLod(surfaceDistance);
+    float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
+    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a, distanceLod, jitter);
 
     FragColor = clouds;
 }

@@ -124,7 +124,7 @@ float computeLodFactor(vec3 ro, vec3 rd) {
     return clamp(mix(distanceLod, distanceLod + horizonAlign * 0.5, 0.65), 0.0, 1.0);
 }
 
-bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, out vec3 pos, out float t) {
+bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, float tMin, float tMax, out vec3 pos, out float t) {
     int stepBudget = int(mix(float(planetMaxSteps), float(planetMaxSteps) * 0.55, lodFactor));
     stepBudget = max(stepBudget, 1);
 
@@ -132,7 +132,7 @@ bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, out vec3 pos, 
     float minStep = mix(planetMinStepFactor * 0.65, planetMinStepFactor * 1.5, lodFactor);
 
     float eps = max(heightScale * 0.01, planetRadius * 0.0001);
-    t = eps * jitter;
+    t = tMin + eps * jitter;
     for (int i = 0; i < 1024; i++) {
         if (i >= stepBudget) break;
         vec3 p = ro + rd * t;
@@ -142,7 +142,7 @@ bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, out vec3 pos, 
             return true;
         }
         t += max(d * adaptiveScale, eps * minStep);
-        if (t > maxRayDistance) break;
+        if (t > tMax) break;
     }
     return false;
 }
@@ -214,14 +214,48 @@ void main() {
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
     float lodFactor = computeLodFactor(ro, rd);
 
-    vec3 posPlanet = vec3(0.0);
-    float t;
-    bool hit = marchPlanet(ro, rd, lodFactor, jitter, posPlanet, t);
+    float tAtm0 = 0.0;
+    float tAtm1 = 0.0;
+    bool hitsAtmosphere = intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1);
+
+    float tPlanet0 = 0.0;
+    float tPlanet1 = 0.0;
+    bool hitsPlanetShell = intersectSphere(ro, rd, planetRadius, tPlanet0, tPlanet1);
 
     float waterRadius = planetRadius + seaLevel;
-    float t0, t1;
-    bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, t0, t1) && t1 > 0.0;
-    if (hitWaterSphere && t0 < 0.0) t0 = 0.0;
+    float tWater0 = 0.0;
+    float tWater1 = 0.0;
+    bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, tWater0, tWater1) && tWater1 > 0.0;
+    if (hitWaterSphere && tWater0 < 0.0) tWater0 = 0.0;
+
+    float marchStart = 0.0;
+    float marchEnd = maxRayDistance;
+
+    if (hitsAtmosphere && tAtm1 > 0.0) {
+        marchStart = max(tAtm0, 0.0);
+        marchEnd = min(tAtm1, maxRayDistance);
+    } else if (length(ro) > atmosphereRadius && (!hitsAtmosphere || tAtm1 <= 0.0)) {
+        marchStart = maxRayDistance;
+        marchEnd = maxRayDistance;
+    }
+
+    float shellPadding = max(heightScale * 1.2, planetRadius * 0.001);
+
+    if (hitsPlanetShell && tPlanet1 > 0.0) {
+        float entry = max(tPlanet0, 0.0);
+        marchStart = max(marchStart, max(entry - shellPadding, 0.0));
+        marchEnd = min(marchEnd, tPlanet1 + shellPadding);
+    }
+
+    if (hitWaterSphere) {
+        marchStart = max(marchStart, max(tWater0 - shellPadding, 0.0));
+        marchEnd = min(marchEnd, tWater1 + shellPadding);
+    }
+
+    vec3 posPlanet = vec3(0.0);
+    float t;
+    bool withinSegment = marchEnd > marchStart;
+    bool hit = withinSegment && marchPlanet(ro, rd, lodFactor, jitter, marchStart, marchEnd, posPlanet, t);
 
     float tTerrain = hit ? t : 1e9;
     float heightValue = hit ? terrainHeight(posPlanet) : -1.0;
@@ -237,16 +271,16 @@ void main() {
         waterFlag = 0.0;
     }
 
-    bool waterCoversTerrain = hitWaterSphere && (t0 < tTerrain) && heightValue <= seaLevel;
+    bool waterCoversTerrain = hitWaterSphere && (tWater0 < tTerrain) && heightValue <= seaLevel;
     if (waterCoversTerrain) {
-        vec3 waterSurfacePos = ro + rd * t0;
+        vec3 waterSurfacePos = ro + rd * tWater0;
         posPlanet = waterSurfacePos;
         normalPlanet = normalize(waterSurfacePos);
         // Preserve the underlying terrain color so the lighting pass can
         // treat the water as a transparent volume hovering above it.
         waterFlag = 1.0;
     } else if (!hit) {
-        posPlanet = ro + rd * maxRayDistance;
+        posPlanet = ro + rd * marchEnd;
     }
 
     float cloudMask = 0.0;
@@ -254,8 +288,7 @@ void main() {
     // Only accumulate cloud noise when the view ray actually passes through the
     // atmosphere (or hits the surface). Otherwise distant space renders pick up
     // stray gray cloud patterns.
-    float tAtm0, tAtm1;
-    bool throughAtmosphere = hit || (intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1) && tAtm1 > 0.0);
+    bool throughAtmosphere = hit || (hitsAtmosphere && tAtm1 > 0.0);
     if (throughAtmosphere) {
         vec3 coverageSample = hit ? posPlanet : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
         cloudMask = cloudCoverageField(normalize(coverageSample));
@@ -268,9 +301,9 @@ void main() {
 
     float waterPath = 0.0;
     if (hitWaterSphere) {
-        float waterExit = min(t1, viewDistance);
-        if (waterExit > t0) {
-            waterPath = waterExit - t0;
+        float waterExit = min(tWater1, viewDistance);
+        if (waterExit > tWater0) {
+            waterPath = waterExit - tWater0;
         }
     }
 

@@ -37,7 +37,7 @@ SEA_LEVEL = 0.0  # meters above the planet radius
 # Slightly brighter water with a touch more scattering makes oceans stand out
 # against land.
 WATER_COLOR = np.array([0.02, 0.16, 0.24], dtype=np.float32)
-WATER_ABSORPTION = 0.74
+WATER_ABSORPTION = 0.00074
 WATER_SCATTERING = 0.24
 
 # Raymarch distances scale with the planet to ensure intersections are found
@@ -65,7 +65,7 @@ PLANET_STEP_SCALE = 0.17
 PLANET_MIN_STEP_FACTOR = 0.5
 
 CLOUD_MAX_STEPS = 48
-CLOUD_EXTINCTION = 0.55
+CLOUD_EXTINCTION = 0.00055
 CLOUD_PHASE_EXPONENT = 2.5
 CLOUD_ANIMATION_SPEED = 0.006
 

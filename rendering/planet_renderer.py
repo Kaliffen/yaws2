@@ -2,7 +2,7 @@ from OpenGL.GL import *
 import numpy as np
 
 from gl_utils.buffers import create_color_fbo, create_gbuffer
-from rendering.constants import PlanetParameters
+from rendering.constants import PLANET_RADIUS, PlanetParameters
 from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
 
 
@@ -96,6 +96,9 @@ class PlanetRenderer:
         self.cloud_buffer = create_color_fbo(width, height)
 
     def _bind_common_uniforms(self, program, width, height):
+        length_scale = max(self.parameters.planet_radius / PLANET_RADIUS, 1e-6)
+        scaled_water_absorption = self.parameters.water_absorption / length_scale
+
         set_vec3(program, "camPos", self.cam_pos)
         set_vec3(program, "camForward", self.cam_forward)
         set_vec3(program, "camRight", self.cam_right)
@@ -118,7 +121,7 @@ class PlanetRenderer:
         set_float(program, "timeSeconds", self.time_seconds)
 
         set_vec3(program, "waterColor", self.parameters.water_color)
-        set_float(program, "waterAbsorption", self.parameters.water_absorption)
+        set_float(program, "waterAbsorption", scaled_water_absorption)
         set_float(program, "waterScattering", self.parameters.water_scattering)
         set_mat3(program, "planetToWorld", self.planet_to_world)
         set_mat3(program, "worldToPlanet", self.world_to_planet)
@@ -239,7 +242,9 @@ class PlanetRenderer:
         glUseProgram(self.cloud_program)
         self._bind_common_uniforms(self.cloud_program, width, height)
         set_int(self.cloud_program, "cloudMaxSteps", self.parameters.cloud_max_steps)
-        set_float(self.cloud_program, "cloudExtinction", self.parameters.cloud_extinction)
+        length_scale = max(self.parameters.planet_radius / PLANET_RADIUS, 1e-6)
+        scaled_cloud_extinction = self.parameters.cloud_extinction / length_scale
+        set_float(self.cloud_program, "cloudExtinction", scaled_cloud_extinction)
         set_float(self.cloud_program, "cloudPhaseExponent", self.parameters.cloud_phase_exponent)
 
         glActiveTexture(GL_TEXTURE0)

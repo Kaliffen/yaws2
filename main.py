@@ -353,12 +353,12 @@ def main():
 
         io = imgui.get_io()
 
-        surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
-        in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
-        if gravity_enabled and in_atmosphere:
+        if gravity_enabled:
             camera.position = spin_delta @ camera.position
             camera.velocity = spin_delta @ camera.velocity
-            surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
+
+        surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
+        in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
 
         if gravity_enabled and in_atmosphere and surface_info is not None:
             camera.set_reference_up(surface_info["normal"])

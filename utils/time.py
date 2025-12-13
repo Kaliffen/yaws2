@@ -1,6 +1,8 @@
 import time
 from dataclasses import dataclass
 
+import numpy as np
+
 
 class DeltaTimer:
     def __init__(self):
@@ -58,3 +60,26 @@ class PlanetCalendar:
 
     def current_state(self) -> CalendarState:
         return self._state_from_elapsed()
+
+
+def compute_sun_direction(day_fraction: float, year_fraction: float, tilt_degrees: float) -> np.ndarray:
+    """Compute a normalized sun direction based on time-of-day and season."""
+
+    declination = np.deg2rad(tilt_degrees) * np.sin(2.0 * np.pi * year_fraction)
+    hour_angle = 2.0 * np.pi * (day_fraction - 0.5)
+    cos_decl = np.cos(declination)
+
+    sun_dir = np.array(
+        [
+            cos_decl * np.cos(hour_angle),
+            np.sin(declination),
+            cos_decl * np.sin(hour_angle),
+        ],
+        dtype=np.float32,
+    )
+
+    norm = np.linalg.norm(sun_dir)
+    if norm > 1e-6:
+        sun_dir /= norm
+
+    return sun_dir

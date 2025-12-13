@@ -79,6 +79,11 @@ float cloudCoverageField(vec3 dir) {
 float terrainHeight(vec3 p) {
     vec3 scaledP = p / planetRadius;
 
+    float altitude = max(length(p) - planetRadius, 0.0);
+    float nearSurface = 1.0 - clamp(altitude / (planetRadius * 0.25), 0.0, 1.0);
+    float detailBoost = 1.0 + nearSurface * 2.5;
+    float fineWeight = nearSurface * nearSurface;
+
     float warpFreq = 1.15;
     float warpAmp = 0.06;
 
@@ -88,12 +93,13 @@ float terrainHeight(vec3 p) {
         fbm(scaledP * warpFreq - vec3(7.5))
     );
 
-    vec3 warpedP = scaledP * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
+    vec3 warpedP = scaledP * (8.0 * detailBoost) + (warp - 0.5) * 2.0 * warpAmp;
 
     float base = fbm(warpedP);
-    float detail = fbm(warpedP * 2.5) * 0.35;
+    float detail = fbm(warpedP * (2.5 * detailBoost)) * mix(0.15, 0.35, fineWeight);
+    float micro = fbm(warpedP * (6.0 * detailBoost)) * 0.12 * fineWeight;
 
-    float normalized = base * 0.62 + detail * 0.38;
+    float normalized = base * 0.62 + detail * 0.28 + micro * 0.1;
     // Bias the terrain downward so a portion of the surface sits below sea level,
     // revealing oceans instead of an all-land sphere.
     return (normalized - 0.42) * heightScale;
@@ -116,12 +122,16 @@ bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
     for (int i = 0; i < 1024; i++) {
         if (i >= planetMaxSteps) break;
         vec3 p = ro + rd * t;
+        float altitude = max(length(p) - planetRadius, 0.0);
+        float farBlend = clamp(altitude / (planetRadius * 0.5), 0.0, 1.0);
+        float adaptiveStepScale = mix(planetStepScale * 0.65, planetStepScale * 1.8, farBlend);
+        float adaptiveMinFactor = mix(planetMinStepFactor * 0.5, planetMinStepFactor * 1.2, farBlend);
         float d = planetSDF(p);
         if (d < eps) {
             pos = p;
             return true;
         }
-        t += max(d * planetStepScale, eps * planetMinStepFactor);
+        t += max(d * adaptiveStepScale, eps * adaptiveMinFactor);
         if (t > maxRayDistance) break;
     }
     return false;

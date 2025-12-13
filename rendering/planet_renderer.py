@@ -1,10 +1,11 @@
 from OpenGL.GL import *
 import numpy as np
 
-from gl_utils.buffers import create_color_fbo, create_gbuffer
+from gl_utils.buffers import create_3d_texture, create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
 from utils.time import compute_sun_direction
 from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
+from rendering.precomputed_fields import generate_noise_volume, generate_sdf_volume
 
 
 class PlanetRenderer:
@@ -40,6 +41,47 @@ class PlanetRenderer:
         self.world_to_planet = np.identity(3, dtype=np.float32)
         self.time_seconds = 0.0
         self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
+        self.noise_texture = None
+        self.sdf_texture = None
+        self.noise_bounds = None
+        self.sdf_bounds = None
+        self._fields_dirty = True
+
+    def _ensure_precomputed_fields(self):
+        if not self._fields_dirty and self.noise_texture is not None and self.sdf_texture is not None:
+            return
+
+        noise_volume, noise_min, noise_max = generate_noise_volume()
+        if self.noise_texture:
+            glDeleteTextures([self.noise_texture])
+        self.noise_texture = create_3d_texture(noise_volume)
+        self.noise_bounds = (noise_min, noise_max)
+
+        sdf_volume, sdf_min, sdf_max = generate_sdf_volume(
+            self.parameters.planet_radius,
+            self.parameters.height_scale,
+            self.parameters.max_ray_distance,
+        )
+        if self.sdf_texture:
+            glDeleteTextures([self.sdf_texture])
+        self.sdf_texture = create_3d_texture(sdf_volume)
+        self.sdf_bounds = (sdf_min, sdf_max)
+        self._fields_dirty = False
+
+    def _bind_precomputed_textures(self, program, include_sdf=True, include_noise=True):
+        if include_noise and self.noise_texture is not None:
+            glActiveTexture(GL_TEXTURE0 + 6)
+            glBindTexture(GL_TEXTURE_3D, self.noise_texture)
+            set_int(program, "noiseVolume", 6)
+            set_vec3(program, "noiseMin", self.noise_bounds[0])
+            set_vec3(program, "noiseExtent", self.noise_bounds[1] - self.noise_bounds[0])
+
+        if include_sdf and self.sdf_texture is not None:
+            glActiveTexture(GL_TEXTURE0 + 7)
+            glBindTexture(GL_TEXTURE_3D, self.sdf_texture)
+            set_int(program, "sdfVolume", 7)
+            set_vec3(program, "sdfMin", self.sdf_bounds[0])
+            set_vec3(program, "sdfExtent", self.sdf_bounds[1] - self.sdf_bounds[0])
 
     def _ensure_surface_info_buffer(self):
         if self.surface_info_buffer is not None:
@@ -133,11 +175,13 @@ class PlanetRenderer:
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
         self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
+        self._fields_dirty = True
 
     def query_surface_info(self, query_pos, min_altitude_offset=0.0):
         if self.surface_info_program is None:
             return None
 
+        self._ensure_precomputed_fields()
         self._ensure_surface_info_buffer()
 
         glUseProgram(self.surface_info_program)
@@ -147,6 +191,7 @@ class PlanetRenderer:
         set_float(self.surface_info_program, "seaLevel", self.parameters.sea_level)
         set_mat3(self.surface_info_program, "worldToPlanet", self.world_to_planet)
         set_float(self.surface_info_program, "minAltitudeOffset", float(min_altitude_offset))
+        self._bind_precomputed_textures(self.surface_info_program, include_noise=False)
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, self.surface_info_buffer)
         glDispatchCompute(1, 1, 1)
@@ -172,6 +217,7 @@ class PlanetRenderer:
         }
 
     def render(self, cam_pos, cam_front, cam_right, cam_up, width, height, debug_level, calendar_state):
+        self._ensure_precomputed_fields()
         self.cam_pos = cam_pos
         self.cam_forward = cam_front
         self.cam_right = cam_right
@@ -190,6 +236,7 @@ class PlanetRenderer:
 
         glUseProgram(self.gbuffer_program)
         self._bind_common_uniforms(self.gbuffer_program, width, height)
+        self._bind_precomputed_textures(self.gbuffer_program)
         set_int(self.gbuffer_program, "planetMaxSteps", self.parameters.planet_max_steps)
         set_float(self.gbuffer_program, "planetStepScale", self.parameters.planet_step_scale)
         set_float(self.gbuffer_program, "planetMinStepFactor", self.parameters.planet_min_step_factor)
@@ -251,6 +298,7 @@ class PlanetRenderer:
 
         glUseProgram(self.cloud_program)
         self._bind_common_uniforms(self.cloud_program, width, height)
+        self._bind_precomputed_textures(self.cloud_program, include_sdf=False)
         set_int(self.cloud_program, "cloudMaxSteps", self.parameters.cloud_max_steps)
         set_float(self.cloud_program, "cloudExtinction", self.parameters.cloud_extinction)
         set_float(self.cloud_program, "cloudPhaseExponent", self.parameters.cloud_phase_exponent)

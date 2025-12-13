@@ -29,6 +29,35 @@ def create_fullscreen_quad():
     return vao
 
 
+def create_3d_texture(data: np.ndarray, filter_mode=GL_LINEAR) -> int:
+    data = np.ascontiguousarray(np.transpose(data.astype(np.float32), (2, 1, 0)))
+    depth, height, width = data.shape
+
+    tex = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_3D, tex)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, filter_mode)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, filter_mode)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
+
+    glTexImage3D(
+        GL_TEXTURE_3D,
+        0,
+        GL_R32F,
+        width,
+        height,
+        depth,
+        0,
+        GL_RED,
+        GL_FLOAT,
+        data,
+    )
+
+    glBindTexture(GL_TEXTURE_3D, 0)
+    return tex
+
+
 def create_texture(width, height, attachment, internal_format=GL_RGBA16F, format=GL_RGBA, type=GL_FLOAT):
     tex = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, tex)

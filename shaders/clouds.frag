@@ -29,6 +29,9 @@ uniform float cloudPhaseExponent;
 uniform float cloudAnimationSpeed;
 uniform mat3 worldToPlanet;
 uniform float timeSeconds;
+uniform sampler3D noiseVolume;
+uniform vec3 noiseMin;
+uniform vec3 noiseExtent;
 
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
@@ -46,36 +49,20 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     return mix(base, twilightColor, goldenBand * 0.18);
 }
 
-float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1));
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+vec3 normalizeCoord(vec3 p, vec3 minCorner, vec3 extent) {
+    return clamp((p - minCorner) / extent, 0.0, 0.999);
 }
 
-float noise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    float n000 = hash(i + vec3(0,0,0));
-    float n001 = hash(i + vec3(0,0,1));
-    float n010 = hash(i + vec3(0,1,0));
-    float n011 = hash(i + vec3(0,1,1));
-    float n100 = hash(i + vec3(1,0,0));
-    float n101 = hash(i + vec3(1,0,1));
-    float n110 = hash(i + vec3(1,1,0));
-    float n111 = hash(i + vec3(1,1,1));
-    vec3 u = f * f * (3.0 - 2.0 * f);
-    return mix(
-        mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-        mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
-        u.z
-    );
+float sampleNoise(vec3 p) {
+    vec3 coord = normalizeCoord(p, noiseMin, noiseExtent);
+    return texture(noiseVolume, coord).r;
 }
 
 float fbm(vec3 p) {
     float v = 0.0;
     float a = 0.5;
     for (int i = 0; i < 5; i++) {
-        v += a * noise(p);
+        v += a * sampleNoise(p);
         p *= 2.0;
         a *= 0.5;
     }

@@ -228,6 +228,7 @@ void main() {
     float tWater0 = 0.0;
     float tWater1 = 0.0;
     bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, tWater0, tWater1) && tWater1 > 0.0;
+    bool insideWater = hitWaterSphere && tWater0 < 0.0;
     if (hitWaterSphere && tWater0 < 0.0) tWater0 = 0.0;
 
     float marchStart = 0.0;
@@ -249,41 +250,62 @@ void main() {
         marchEnd = min(marchEnd, tPlanet1 + shellPadding);
     }
 
+    bool waterSurfaceFirst = false;
+    if (hitWaterSphere) {
+        vec3 waterSurfacePos = ro + rd * tWater0;
+        float waterSurfaceHeight = terrainHeight(waterSurfacePos);
+        waterSurfaceFirst = (!insideWater && waterSurfaceHeight <= seaLevel);
+    }
+
     if (hitWaterSphere) {
         marchStart = max(marchStart, max(tWater0 - shellPadding, 0.0));
         marchEnd = min(marchEnd, tWater1 + shellPadding);
     }
 
     vec3 posPlanet = vec3(0.0);
-    float t;
+    float t = 0.0;
     bool withinSegment = marchEnd > marchStart;
-    bool hit = withinSegment && marchPlanet(ro, rd, lodFactor, jitter, marchStart, marchEnd, posPlanet, t);
+    bool hit = false;
 
-    float tTerrain = hit ? t : 1e9;
-    float heightValue = hit ? terrainHeight(posPlanet) : -1.0;
+    if (!waterSurfaceFirst) {
+        hit = withinSegment && marchPlanet(ro, rd, lodFactor, jitter, marchStart, marchEnd, posPlanet, t);
+    }
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
     float waterFlag = -1.0;
     vec3 normalPlanet = normalize(rd);
+    float heightValue = -1.0;
 
-    if (hit) {
+    if (waterSurfaceFirst) {
+        posPlanet = ro + rd * tWater0;
+        normalPlanet = normalize(posPlanet);
+        baseColor = waterColor;
+        heightValue = seaLevel;
+        waterFlag = 1.0;
+        hit = true;
+        t = tWater0;
+    } else if (hit) {
+        heightValue = terrainHeight(posPlanet);
         float d0 = planetSDF(posPlanet);
         normalPlanet = computeNormal(posPlanet, d0);
         baseColor = landColor(posPlanet, normalPlanet, heightValue);
         waterFlag = 0.0;
     }
 
-    bool waterCoversTerrain = hitWaterSphere && (tWater0 < tTerrain) && heightValue <= seaLevel;
-    if (waterCoversTerrain) {
-        vec3 waterSurfacePos = ro + rd * tWater0;
-        posPlanet = waterSurfacePos;
-        normalPlanet = normalize(waterSurfacePos);
-        // Preserve the underlying terrain color so the lighting pass can
-        // treat the water as a transparent volume hovering above it.
-        waterFlag = 1.0;
-    } else if (!hit) {
-        posPlanet = ro + rd * marchEnd;
+    if (!hit) {
+        float fallbackT = hitWaterSphere ? min(tWater1, marchEnd) : marchEnd;
+        posPlanet = ro + rd * fallbackT;
+        if (insideWater) {
+            normalPlanet = normalize(posPlanet);
+            baseColor = waterColor;
+            heightValue = seaLevel;
+            waterFlag = 1.0;
+            hit = true;
+            t = fallbackT;
+        }
     }
+
+    float tTerrain = hit ? t : 1e9;
 
     float cloudMask = 0.0;
 
@@ -303,9 +325,12 @@ void main() {
 
     float waterPath = 0.0;
     if (hitWaterSphere) {
+        float waterEntry = max(tWater0, 0.0);
         float waterExit = min(tWater1, viewDistance);
-        if (waterExit > tWater0) {
-            waterPath = waterExit - tWater0;
+        if (insideWater) {
+            waterPath = hit ? min(tTerrain, waterExit) : waterExit;
+        } else if (!waterSurfaceFirst && hit && tTerrain > waterEntry) {
+            waterPath = min(tTerrain, waterExit) - waterEntry;
         }
     }
 

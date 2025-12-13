@@ -61,12 +61,9 @@ float computeShadow(vec3 pos, vec3 normal) {
     return clamp(ndl * 0.5 + 0.5, 0.0, 1.0) * horizon;
 }
 
-vec3 shadeWater(
+vec3 shadeWaterSurface(
     vec3 pos,
     vec3 normal,
-    vec3 floorColor,
-    float depth,
-    float viewWaterThickness,
     vec3 sunColor,
     float shadow,
     vec3 ambientLight
@@ -76,32 +73,25 @@ vec3 shadeWater(
 
     float ndl = max(dot(normal, lightDir), 0.0);
     float viewFacing = max(dot(normal, viewDir), 0.0);
-    float entryCos = max(dot(normal, -viewDir), 0.05);
-
-    // Beer-Lambert attenuation scaled by incidence angle so grazing views
-    // travel through more water and darken appropriately.
-    float pathLength = depth / entryCos + viewWaterThickness;
-    float absorption = exp(-waterAbsorption * pathLength * 0.42);
-
-    // Forward scattering brightens water that looks toward the sun.
-    float forward = pow(max(dot(viewDir, lightDir), 0.0), 4.0);
-    float scatterAmount = mix(0.12, 0.75, waterScattering);
-    float sunFacing = ndl * 0.6 + forward;
-    vec3 inScattering = waterColor * (1.0 - absorption) * (0.25 + scatterAmount * sunFacing) * (sunColor * shadow + ambientLight);
-
-    float bedDarken = smoothstep(0.0, 80.0, depth);
-    vec3 transmitted = floorColor * absorption * mix(1.0, 0.25, bedDarken);
-    vec3 reflected = mix(waterColor, sunColor, 0.25) * (0.35 + 0.65 * ndl * shadow);
-
     float fresnel = 0.02 + pow(1.0 - viewFacing, 5.0);
+    float scatterBoost = mix(0.25, 0.85, waterScattering);
 
-    vec3 ambientReflection = ambientLight * (0.25 + 0.35 * (1.0 - absorption));
-    vec3 color = mix(transmitted + inScattering, reflected + ambientReflection, fresnel);
+    vec3 base = waterColor * (ambientLight + sunColor * (0.35 + 0.65 * ndl * shadow));
+    vec3 reflection = mix(waterColor, sunColor, 0.35 * scatterBoost) * (0.4 + 0.6 * shadow * ndl);
+    vec3 color = mix(base, reflection, fresnel);
 
-    float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 48.0) * shadow;
-    color += spec * mix(0.08, 0.35, scatterAmount) * sunColor;
+    float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 42.0) * shadow;
+    color += spec * sunColor * mix(0.08, 0.26, scatterBoost);
 
     return color;
+}
+
+vec3 applyWaterFog(vec3 color, float waterPath, vec3 sunColor, vec3 ambientLight) {
+    float attenuation = exp(-waterAbsorption * waterPath * 0.65);
+    float murk = smoothstep(0.0, 140.0, waterPath);
+    float scatter = mix(0.25, 0.85, waterScattering);
+    vec3 fog = mix(waterColor * 0.25, waterColor * 0.65, murk) * (sunColor * (0.15 + 0.35 * scatter) + ambientLight * 0.55);
+    return mix(fog, color, attenuation);
 }
 
 void main() {
@@ -147,22 +137,16 @@ void main() {
     vec3 viewDir2 = distToPos > 0.0 ? toPos / distToPos : vec3(0.0, 0.0, 1.0);
     float waterPath = max(viewData.w, 0.0);
 
-    float waterDepth = (waterFlag > 0.5) ? max(seaLevel - heightValue, 0.0) : 0.0;
-    vec3 waterShaded = shadeWater(pos, normal, albedo, waterDepth, waterPath, effectiveSunColor, shadow, ambient);
-
     vec3 color = albedo * (ambient + directLight * shadow);
     if (waterFlag > 0.5) {
-        color = waterShaded;
+        color = shadeWaterSurface(pos, normal, effectiveSunColor, shadow, ambient);
     } else {
         float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 24.0) * shadow;
         color += spec * effectiveSunColor * 0.08;
+    }
 
-        if (waterPath > 0.0) {
-            float waterAtten = exp(-waterAbsorption * waterPath * 0.65);
-            float murk = smoothstep(0.0, 120.0, waterPath);
-            vec3 fog = mix(waterColor * 0.35, waterColor * 0.6, murk) * (effectiveSunColor * 0.25 + ambient * 0.5);
-            color = mix(fog, color, waterAtten);
-        }
+    if (waterPath > 0.0) {
+        color = applyWaterFog(color, waterPath, effectiveSunColor, ambient);
     }
 
     FragColor = vec4(color, shadow);

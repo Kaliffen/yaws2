@@ -17,10 +17,9 @@ layout(std430, binding = 0) buffer SurfaceInfo {
 };
 
 float noise(vec3 p) {
-    vec3 cell = floor(p);
-    vec3 f = fract(p);
-    vec3 wrappedCell = mod(cell, terrainNoiseSize);
-    vec3 coord = (wrappedCell + f) / terrainNoiseSize;
+    // Use normalized coordinates that cover the full seamless noise volume
+    // instead of sampling a tiny texel neighborhood near the origin.
+    vec3 coord = fract(p * 0.5 + 0.5);
     return texture(terrainNoise, coord).r;
 }
 

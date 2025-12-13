@@ -36,10 +36,10 @@ uniform float cloudCoverage;
 
 // Helpers
 float noise(vec3 p) {
-    vec3 cell = floor(p);
-    vec3 f = fract(p);
-    vec3 wrappedCell = mod(cell, terrainNoiseSize);
-    vec3 coord = (wrappedCell + f) / terrainNoiseSize;
+    // Sample the precomputed seamless volume directly in normalized coordinates,
+    // using the input position to span the full 0..1 domain so we don't zoom
+    // into a tiny texel neighborhood.
+    vec3 coord = fract(p * 0.5 + 0.5);
     return texture(terrainNoise, coord).r;
 }
 

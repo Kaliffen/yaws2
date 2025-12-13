@@ -331,10 +331,14 @@ def main():
     imgui.create_context()
     imgui_renderer = GlfwRenderer(window)
 
+    prev_planet_to_world = renderer.planet_to_world.copy()
+    prev_world_to_planet = renderer.world_to_planet.copy()
+
     while not glfw.window_should_close(window):
         dt = timer.get_delta()
         calendar_state = calendar.advance(dt, editing_params.time_speed)
         renderer.prepare_frame_state(calendar_state)
+        spin_delta = renderer.planet_to_world @ prev_world_to_planet
         glfw.poll_events()
         imgui_renderer.process_inputs()
         imgui.new_frame()
@@ -343,6 +347,10 @@ def main():
 
         surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
         in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
+        if gravity_enabled and in_atmosphere:
+            camera.position = spin_delta @ camera.position
+            camera.velocity = spin_delta @ camera.velocity
+            surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
 
         if gravity_enabled and in_atmosphere and surface_info is not None:
             camera.set_reference_up(surface_info["normal"])
@@ -395,7 +403,7 @@ def main():
                 if np.linalg.norm(tangent_forward) < 1e-5:
                     tangent_forward = project_to_plane(camera.right, surface_normal)
                 tangent_forward = normalize(tangent_forward)
-                tangent_right = normalize(np.cross(surface_normal, tangent_forward))
+                tangent_right = normalize(np.cross(tangent_forward, surface_normal))
 
                 move_dir = np.zeros(3, dtype=np.float32)
                 if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
@@ -507,6 +515,9 @@ def main():
         imgui_renderer.render(imgui.get_draw_data())
 
         glfw.swap_buffers(window)
+
+        prev_planet_to_world = renderer.planet_to_world.copy()
+        prev_world_to_planet = renderer.world_to_planet.copy()
 
     glfw.terminate()
 

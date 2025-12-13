@@ -30,6 +30,11 @@ uniform float cloudAnimationSpeed;
 uniform mat3 worldToPlanet;
 uniform float timeSeconds;
 
+float invPlanetRadius;
+float planetRadiusNormalized;
+float cloudBaseAltitudeNormalized;
+float cloudLayerThicknessNormalized;
+
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
 
@@ -111,7 +116,7 @@ float cloudCoverageField(vec3 dir) {
 }
 
 float cloudShapeNoise(vec3 p) {
-    vec3 normalizedP = p / planetRadius;
+    vec3 normalizedP = p * invPlanetRadius;
     float cloudTime = timeSeconds * cloudAnimationSpeed;
     float swirlAngle = cloudTime * 0.02;
     vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
@@ -124,8 +129,8 @@ float cloudShapeNoise(vec3 p) {
 }
 
 float sampleCloudDensity(vec3 p, float coverageHint) {
-    float layerBaseRadius = planetRadius + cloudBaseAltitude;
-    float heightNorm = clamp((length(p) - layerBaseRadius) / max(cloudLayerThickness, 0.001), 0.0, 1.0);
+    float layerBaseRadius = planetRadiusNormalized + cloudBaseAltitudeNormalized;
+    float heightNorm = clamp((length(p) - layerBaseRadius) / max(cloudLayerThicknessNormalized, 0.001), 0.0, 1.0);
 
     float coverage = cloudCoverageField(normalize(p));
     coverage = mix(coverage, coverageHint, 0.25);
@@ -157,13 +162,13 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
 }
 
 float computeDistanceLod(float surfaceDistance) {
-    float normalized = log2(1.0 + surfaceDistance / max(planetRadius, 0.0001));
+    float normalized = log2(1.0 + surfaceDistance / max(planetRadiusNormalized, 0.0001));
     return clamp(normalized * 0.55, 0.0, 1.0);
 }
 
 vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float coverageHint, float distanceLod, float jitter) {
-    float baseRadius = planetRadius + cloudBaseAltitude;
-    float topRadius = baseRadius + cloudLayerThickness;
+    float baseRadius = planetRadiusNormalized + cloudBaseAltitudeNormalized;
+    float topRadius = baseRadius + cloudLayerThicknessNormalized;
 
     float tOuter0, tOuter1;
     if (!intersectSphere(rayOrigin, rayDir, topRadius, tOuter0, tOuter1) || tOuter1 <= 0.0) {
@@ -251,10 +256,15 @@ void main() {
     vec4 viewData = texture(gViewData, uv);
     bool hit = normalFlags.w > -0.5;
 
-    vec3 camPlanet = worldToPlanet * camPos;
+    invPlanetRadius = planetRadius > 0.0 ? 1.0 / planetRadius : 0.0;
+    planetRadiusNormalized = planetRadius * invPlanetRadius;
+    cloudBaseAltitudeNormalized = cloudBaseAltitude * invPlanetRadius;
+    cloudLayerThicknessNormalized = cloudLayerThickness * invPlanetRadius;
+
+    vec3 camPlanet = (worldToPlanet * camPos) * invPlanetRadius;
     vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
-    float surfaceDistance = viewData.x;
+    float surfaceDistance = viewData.x * invPlanetRadius;
     float distanceLod = computeDistanceLod(surfaceDistance);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
     vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a, distanceLod, jitter);

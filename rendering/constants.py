@@ -5,11 +5,11 @@ import numpy as np
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 SUN_POWER = 1.5
-SCALAR = 1.0
-# Base scale values for the planet and atmosphere (kilometers)
-# Use a realistic Earth-sized radius so the horizon and curvature feel correct
-# when flying close to the surface.
-PLANET_RADIUS = 6371.0 * SCALAR
+SCALAR = 6371.0 * 100.0
+# Base scale values for the planet and atmosphere. SCALAR anchors world-space
+# distances to an Earth-sized baseline, multiplied by an additional factor so
+# larger planets still behave proportionally in the shaders and controls.
+PLANET_RADIUS = 1.0 * SCALAR
 
 # Express atmospheric and cloud heights as percentages of the planet radius
 # or atmosphere thickness so they automatically scale. A thinner 3% shell keeps
@@ -26,8 +26,10 @@ CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 432.2 * SCALAR
+# exaggerated features, but still allow visible mountain ranges. The ratio is
+# derived from Earth values so scaling the planet radius preserves proportions.
+_HEIGHT_SCALE_RATIO = 432.2 / 6371.0
+HEIGHT_SCALE = PLANET_RADIUS * _HEIGHT_SCALE_RATIO
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional
@@ -110,7 +112,14 @@ class PlanetParameters:
     tilt_degrees: float = TILT_DEGREES
     time_speed: float = TIME_SPEED
 
-    def scale_with_planet_radius(self) -> None:
+    def scale_with_planet_radius(self, previous_radius: float | None = None) -> None:
+        reference_radius = PLANET_RADIUS if previous_radius is None else previous_radius
+        if reference_radius > 0.0:
+            height_scale_ratio = self.height_scale / reference_radius
+            sea_level_ratio = self.sea_level / reference_radius
+        else:
+            height_scale_ratio = HEIGHT_SCALE / PLANET_RADIUS if PLANET_RADIUS > 0.0 else 0.0
+            sea_level_ratio = SEA_LEVEL / PLANET_RADIUS if PLANET_RADIUS > 0.0 else 0.0
         atmosphere_thickness = self.planet_radius * (self.atmosphere_thickness_percent / 100.0)
         self.atmosphere_radius = self.planet_radius + atmosphere_thickness
         cloud_base_ratio = np.clip(self.cloud_base_percent / 100.0, 0.0, 1.0)
@@ -121,11 +130,13 @@ class PlanetParameters:
         self.cloud_base_altitude = atmosphere_thickness * cloud_base_ratio
         self.cloud_layer_thickness = atmosphere_thickness * cloud_thickness_ratio
         max_ray_distance_factor = (
-            self.max_ray_distance / self.planet_radius
-            if self.planet_radius > 0.0
+            self.max_ray_distance / reference_radius
+            if reference_radius > 0.0
             else MAX_RAY_DISTANCE_FACTOR
         )
         self.max_ray_distance = self.planet_radius * max_ray_distance_factor
+        self.height_scale = self.planet_radius * height_scale_ratio
+        self.sea_level = self.planet_radius * sea_level_ratio
 
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(

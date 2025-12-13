@@ -7,9 +7,13 @@ import numpy as np
 from gl_utils.program import create_compute_program, create_program
 from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import FPSCamera, normalize, WORLD_UP
-from rendering.constants import PlanetParameters, default_planet_parameters, SCALAR
+from rendering.constants import PLANET_RADIUS, PlanetParameters, default_planet_parameters
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer, PlanetCalendar
+
+
+BASE_SPEED_PER_RADIUS = 60.0 / 6371.0
+GRAVITY_ACCEL_PER_RADIUS = 35.0 / 6371.0
 
 
 def compute_adaptive_speed(position, base_speed, planet_radius):
@@ -85,11 +89,12 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
 
     _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
 
+    previous_radius = editing_params.planet_radius
     planet_changed, editing_params.planet_radius = imgui.input_float(
         "Planet radius (m)", editing_params.planet_radius, step=10.0, step_fast=50.0
     )
     if planet_changed:
-        editing_params.scale_with_planet_radius()
+        editing_params.scale_with_planet_radius(previous_radius=previous_radius)
     atmos_changed, editing_params.atmosphere_thickness_percent = imgui.slider_float(
         "Atmosphere thickness (%)", editing_params.atmosphere_thickness_percent, 0.5, 20.0
     )
@@ -100,7 +105,7 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
         "Cloud thickness (% of atmosphere)", editing_params.cloud_layer_thickness_percent, 0.0, 100.0
     )
     if atmos_changed or cloud_base_changed or cloud_thickness_changed:
-        editing_params.scale_with_planet_radius()
+        editing_params.scale_with_planet_radius(previous_radius=editing_params.planet_radius)
     imgui.text(f"Atmosphere radius: {editing_params.atmosphere_radius:.2f} m")
     imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude:.2f} m")
     imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness:.2f} m")
@@ -291,8 +296,10 @@ def main():
         pitch=0.0
     )
     # Start with a modest base speed so surface traversal feels grounded. Speed
-    # ramps up automatically as you get farther from the planet.
-    base_speed = 60.0 * SCALAR
+    # ramps up automatically as you get farther from the planet. Keep it scaled
+    # to the planet radius so movement stays proportional when the world size
+    # changes.
+    base_speed = parameters.planet_radius * BASE_SPEED_PER_RADIUS
     camera.speed = base_speed
     camera.min_radius = None
 
@@ -315,7 +322,7 @@ def main():
     space_pressed = False
     gravity_enabled = False
     g_pressed = False
-    gravity_acceleration = 35.0
+    gravity_acceleration = parameters.planet_radius * GRAVITY_ACCEL_PER_RADIUS
     min_ground_clearance = 0.0
 
     last_mouse_x, last_mouse_y = width / 2, height / 2
@@ -485,6 +492,8 @@ def main():
         if update_clicked:
             parameters = editing_params.copy()
             renderer.update_parameters(parameters)
+            base_speed = parameters.planet_radius * BASE_SPEED_PER_RADIUS
+            gravity_acceleration = parameters.planet_radius * GRAVITY_ACCEL_PER_RADIUS
             surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
             if surface_info is not None and surface_info["altitude"] < min_ground_clearance:
                 camera.position = surface_info["normal"] * surface_info["clamped_radius"]

@@ -83,7 +83,7 @@ class PlanetRenderer:
     def _update_sun_direction(self, day_fraction: float, year_fraction: float) -> None:
         self.sun_direction = compute_sun_direction(day_fraction, year_fraction, self.parameters.tilt_degrees)
 
-    def _create_terrain_noise(self, size: int = 96) -> None:
+    def _create_terrain_noise(self, size: int = 128) -> None:
         if self.terrain_noise_tex is not None:
             return
 

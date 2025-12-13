@@ -66,24 +66,30 @@ float cloudCoverageField(vec3 dir) {
 float terrainHeight(vec3 p) {
     vec3 scaledP = p / planetRadius;
 
-    float warpFreq = 1.15;
-    float warpAmp = 0.06;
-
     vec3 warp = vec3(
-        fbm(scaledP * warpFreq + vec3(11.7)),
-        fbm(scaledP * warpFreq + vec3(3.9, 17.2, 5.1)),
-        fbm(scaledP * warpFreq - vec3(7.5))
+        fbm(scaledP * 0.85 + vec3(4.3, 2.1, -6.7)),
+        fbm(scaledP * 0.85 + vec3(-7.1, 5.4, 1.3)),
+        fbm(scaledP * 0.85 + vec3(3.2, -4.8, 7.9))
     );
 
-    vec3 warpedP = scaledP * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
+    vec3 warpedP = scaledP * 1.65 + (warp - 0.5) * 0.55;
 
-    float base = fbm(warpedP);
-    float detail = fbm(warpedP * 2.5) * 0.35;
+    float continental = fbm(warpedP * 0.75);
+    continental = smoothstep(0.25, 0.68, continental);
 
-    float normalized = base * 0.62 + detail * 0.38;
-    // Bias the terrain downward so a portion of the surface sits below sea level,
-    // revealing oceans instead of an all-land sphere.
-    return (normalized - 0.42) * heightScale;
+    float shelf = fbm(warpedP * 1.35);
+    float landMask = clamp(continental * 0.75 + shelf * 0.35, 0.0, 1.0);
+
+    float plains = fbm(warpedP * 2.4) * 0.35;
+
+    float ridged = 1.0 - abs(fbm(warpedP * 3.4) * 2.0 - 1.0);
+    float mountains = pow(ridged, 3.0) * smoothstep(0.58, 0.9, landMask);
+
+    float deepSea = (1.0 - landMask) * 0.38;
+
+    float height = landMask * 0.55 + plains * 0.28 + mountains * 0.42 - deepSea - 0.28;
+
+    return height * heightScale;
 }
 
 float planetSDF(vec3 p) {

@@ -41,6 +41,29 @@ def create_texture(width, height, attachment, internal_format=GL_RGBA16F, format
     return tex
 
 
+def create_3d_texture(
+    width,
+    height,
+    depth,
+    internal_format=GL_RGBA16F,
+    format=GL_RGBA,
+    type=GL_FLOAT,
+    min_filter=GL_LINEAR,
+    mag_filter=GL_LINEAR,
+    wrap=GL_REPEAT,
+):
+    tex = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_3D, tex)
+    glTexImage3D(GL_TEXTURE_3D, 0, internal_format, width, height, depth, 0, format, type, None)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, min_filter)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, mag_filter)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, wrap)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, wrap)
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, wrap)
+    glBindTexture(GL_TEXTURE_3D, 0)
+    return tex
+
+
 def create_gbuffer(width, height):
     fbo = glGenFramebuffers(1)
     glBindFramebuffer(GL_FRAMEBUFFER, fbo)

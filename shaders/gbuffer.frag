@@ -27,6 +27,8 @@ uniform vec2 resolution;
 uniform mat3 planetToWorld;
 uniform mat3 worldToPlanet;
 uniform float timeSeconds;
+uniform float cloudAnimationSpeed;
+uniform sampler3D coverageNoiseTex;
 
 // Water Parameters
 uniform vec3 waterColor;
@@ -69,10 +71,28 @@ float fbm(vec3 p) {
     return v;
 }
 
+mat3 rotationY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(
+        c, 0.0, s,
+        0.0, 1.0, 0.0,
+        -s, 0.0, c
+    );
+}
+
+vec3 wrapNoiseCoord(vec3 coord) {
+    return coord * 0.5 + 0.5;
+}
+
 float cloudCoverageField(vec3 dir) {
-    float bands = fbm(dir * 3.1 + vec3(1.7, -2.2, 0.5));
-    float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
-    float coverage = bands * 0.65 + streaks * 0.45;
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    float swirlAngle = cloudTime * 0.012;
+    vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
+    vec3 uvw = wrapNoiseCoord(rotationY(swirlAngle) * dir + flowOffset);
+
+    vec3 noiseSample = texture(coverageNoiseTex, uvw).xyz;
+    float coverage = noiseSample.x * 0.65 + noiseSample.y * 0.45 + noiseSample.z * 0.12;
     coverage = coverage * cloudCoverage + 0.12;
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
 }

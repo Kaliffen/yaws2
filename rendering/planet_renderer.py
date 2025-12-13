@@ -1,7 +1,7 @@
 from OpenGL.GL import *
 import numpy as np
 
-from gl_utils.buffers import create_color_fbo, create_gbuffer
+from gl_utils.buffers import create_3d_texture, create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
 from utils.time import compute_sun_direction
 from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
@@ -16,6 +16,7 @@ class PlanetRenderer:
         cloud_program,
         composite_program,
         surface_info_program,
+        cloud_noise_program,
         parameters: PlanetParameters,
     ):
         self.gbuffer_program = gbuffer_program
@@ -24,12 +25,16 @@ class PlanetRenderer:
         self.cloud_program = cloud_program
         self.composite_program = composite_program
         self.surface_info_program = surface_info_program
+        self.cloud_noise_program = cloud_noise_program
         self.parameters = parameters
         self.gbuffer = None
         self.lighting_buffer = None
         self.atmosphere_buffer = None
         self.cloud_buffer = None
         self.surface_info_buffer = None
+        self.coverage_noise_tex = None
+        self.shape_noise_tex = None
+        self.cloud_noise_size = 64
         self.cam_pos = None
         self.cam_forward = None
         self.cam_right = None
@@ -96,6 +101,45 @@ class PlanetRenderer:
         self.lighting_buffer = create_color_fbo(width, height)
         self.atmosphere_buffer = create_color_fbo(width, height)
         self.cloud_buffer = create_color_fbo(width, height)
+
+    def _ensure_cloud_noise_lut(self):
+        if self.cloud_noise_program is None:
+            return
+
+        if self.coverage_noise_tex and self.shape_noise_tex:
+            return
+
+        size = self.cloud_noise_size
+        self.coverage_noise_tex = create_3d_texture(size, size, size)
+        self.shape_noise_tex = create_3d_texture(size, size, size)
+
+        glUseProgram(self.cloud_noise_program)
+        loc = glGetUniformLocation(self.cloud_noise_program, "volumeSize")
+        glUniform3i(loc, size, size, size)
+
+        glBindImageTexture(0, self.coverage_noise_tex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F)
+        glBindImageTexture(1, self.shape_noise_tex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F)
+
+        group_size = 4
+        glDispatchCompute((size + group_size - 1) // group_size, (size + group_size - 1) // group_size, (size + group_size - 1) // group_size)
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT)
+
+    def _bind_coverage_texture(self, program, unit):
+        if self.coverage_noise_tex is None:
+            return
+
+        glActiveTexture(GL_TEXTURE0 + unit)
+        glBindTexture(GL_TEXTURE_3D, self.coverage_noise_tex)
+        set_int(program, "coverageNoiseTex", unit)
+
+    def _bind_cloud_noise_textures(self, program, coverage_unit=4, shape_unit=5):
+        if self.coverage_noise_tex is None or self.shape_noise_tex is None:
+            return
+
+        self._bind_coverage_texture(program, coverage_unit)
+        glActiveTexture(GL_TEXTURE0 + shape_unit)
+        glBindTexture(GL_TEXTURE_3D, self.shape_noise_tex)
+        set_int(program, "shapeNoiseTex", shape_unit)
 
     def _bind_common_uniforms(self, program, width, height):
         set_vec3(program, "camPos", self.cam_pos)
@@ -181,6 +225,7 @@ class PlanetRenderer:
         self._update_sun_direction(calendar_state.day_fraction, calendar_state.year_fraction)
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
+        self._ensure_cloud_noise_lut()
 
         # Pass 1: populate G-buffer
         glBindFramebuffer(GL_FRAMEBUFFER, self.gbuffer["fbo"])
@@ -193,6 +238,7 @@ class PlanetRenderer:
         set_int(self.gbuffer_program, "planetMaxSteps", self.parameters.planet_max_steps)
         set_float(self.gbuffer_program, "planetStepScale", self.parameters.planet_step_scale)
         set_float(self.gbuffer_program, "planetMinStepFactor", self.parameters.planet_min_step_factor)
+        self._bind_coverage_texture(self.gbuffer_program, 4)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
@@ -270,6 +316,7 @@ class PlanetRenderer:
         glActiveTexture(GL_TEXTURE3)
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["view_data"])
         set_int(self.cloud_program, "gViewData", 3)
+        self._bind_cloud_noise_textures(self.cloud_program, coverage_unit=4, shape_unit=5)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 

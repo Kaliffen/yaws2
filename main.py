@@ -270,6 +270,8 @@ def main():
         cloud_src = f.read()
     with open("shaders/composite.frag") as f:
         composite_src = f.read()
+    with open("shaders/cloud_noise.comp") as f:
+        cloud_noise_src = f.read()
     with open("shaders/surface_info.comp") as f:
         surface_info_src = f.read()
 
@@ -278,6 +280,7 @@ def main():
     atmosphere_program = create_program(vert_src, atmosphere_src)
     cloud_program = create_program(vert_src, cloud_src)
     composite_program = create_program(vert_src, composite_src)
+    cloud_noise_program = create_compute_program(cloud_noise_src)
     surface_info_program = create_compute_program(surface_info_src)
 
     glUseProgram(gbuffer_program)
@@ -303,6 +306,7 @@ def main():
         cloud_program,
         composite_program,
         surface_info_program,
+        cloud_noise_program,
         parameters,
     )
     timer = DeltaTimer()

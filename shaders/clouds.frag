@@ -29,6 +29,8 @@ uniform float cloudPhaseExponent;
 uniform float cloudAnimationSpeed;
 uniform mat3 worldToPlanet;
 uniform float timeSeconds;
+uniform sampler3D coverageNoiseTex;
+uniform sampler3D shapeNoiseTex;
 
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
@@ -46,42 +48,6 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     return mix(base, twilightColor, goldenBand * 0.18);
 }
 
-float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1));
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-
-float noise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    float n000 = hash(i + vec3(0,0,0));
-    float n001 = hash(i + vec3(0,0,1));
-    float n010 = hash(i + vec3(0,1,0));
-    float n011 = hash(i + vec3(0,1,1));
-    float n100 = hash(i + vec3(1,0,0));
-    float n101 = hash(i + vec3(1,0,1));
-    float n110 = hash(i + vec3(1,1,0));
-    float n111 = hash(i + vec3(1,1,1));
-    vec3 u = f * f * (3.0 - 2.0 * f);
-    return mix(
-        mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-        mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
-        u.z
-    );
-}
-
-float fbm(vec3 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 5; i++) {
-        v += a * noise(p);
-        p *= 2.0;
-        a *= 0.5;
-    }
-    return v;
-}
-
 mat3 rotationY(float angle) {
     float c = cos(angle);
     float s = sin(angle);
@@ -97,15 +63,18 @@ float interleavedGradientNoise(vec2 pixel) {
     return fract(52.9829189 * fract(f));
 }
 
+vec3 wrapNoiseCoord(vec3 coord) {
+    return coord * 0.5 + 0.5;
+}
+
 float cloudCoverageField(vec3 dir) {
     float cloudTime = timeSeconds * cloudAnimationSpeed;
     float swirlAngle = cloudTime * 0.012;
     vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
-    vec3 spunDir = rotationY(swirlAngle) * dir;
+    vec3 uvw = wrapNoiseCoord(rotationY(swirlAngle) * dir + flowOffset);
 
-    float bands = fbm(spunDir * 3.1 + vec3(1.7, -2.2, 0.5) + flowOffset);
-    float streaks = fbm(spunDir * 7.2 + vec3(-4.1, 2.6, 3.3) - flowOffset);
-    float coverage = bands * 0.65 + streaks * 0.45;
+    vec3 noiseSample = texture(coverageNoiseTex, uvw).xyz;
+    float coverage = noiseSample.x * 0.65 + noiseSample.y * 0.45 + noiseSample.z * 0.12;
     coverage = coverage * cloudCoverage + 0.12;
     return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
 }
@@ -115,12 +84,10 @@ float cloudShapeNoise(vec3 p) {
     float cloudTime = timeSeconds * cloudAnimationSpeed;
     float swirlAngle = cloudTime * 0.02;
     vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
-    vec3 warped = rotationY(swirlAngle) * normalizedP + flowOffset;
+    vec3 uvw = wrapNoiseCoord(rotationY(swirlAngle) * normalizedP + flowOffset);
 
-    float base = fbm(warped * 22.0 + vec3(8.2, 1.7, -3.4));
-    float detail = fbm(warped * 64.0 - vec3(4.1, 5.6, 2.0));
-    float billow = abs(fbm(warped * 12.0 + vec3(-6.0, 2.5, 4.3)) * 2.0 - 1.0);
-    return base * 0.55 + detail * 0.3 + billow * 0.15;
+    vec3 noiseSample = texture(shapeNoiseTex, uvw).xyz;
+    return noiseSample.x * 0.55 + noiseSample.y * 0.3 + noiseSample.z * 0.15;
 }
 
 float sampleCloudDensity(vec3 p, float coverageHint) {

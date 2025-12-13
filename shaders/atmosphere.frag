@@ -62,16 +62,16 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
 
     // Transition from a cool night hue to a tighter, warmer daylight band.
     float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
-    float horizonBand = smoothstep(0.02, 0.18, 1.0 - abs(sunHeight)) * smoothstep(-0.05, 0.18, sunHeight);
+    float goldenBand = smoothstep(0.0, 0.02, 1.0 - abs(sunHeight)) * smoothstep(-0.02, 0.05, sunHeight);
 
     vec3 nightColor = vec3(0.02, 0.06, 0.12);
     vec3 dayColor = vec3(0.26, 0.48, 0.70);
     vec3 goldenColor = vec3(0.98, 0.62, 0.36);
     vec3 twilightColor = vec3(0.30, 0.24, 0.46);
 
-    vec3 warmBlend = mix(dayColor, goldenColor, horizonBand);
+    vec3 warmBlend = mix(dayColor, goldenColor, goldenBand * 0.35);
     vec3 base = mix(nightColor, warmBlend, dayFactor);
-    return mix(base, twilightColor, horizonBand * 0.6);
+    return mix(base, twilightColor, goldenBand * 0.18);
 }
 
 vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface) {

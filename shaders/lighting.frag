@@ -31,11 +31,15 @@ vec3 waterSurfaceNormal(vec3 pos, vec3 normal) {
     vec3 bitangent = normalize(cross(normal, tangent));
 
     vec2 waveCoords = vec2(dot(pos, tangent), dot(pos, bitangent));
-    float slowWaves = sin(dot(waveCoords, vec2(0.18, 0.23)) * 48.0 + timeSeconds * 0.5);
-    float fastWaves = sin(dot(waveCoords, vec2(-0.41, 0.27)) * 96.0 + timeSeconds * 1.8);
-    float choppy = sin(dot(waveCoords, vec2(0.33, -0.52)) * 72.0 + timeSeconds * 1.1);
+    vec2 largeWaves = waveCoords * 0.055 + vec2(timeSeconds * 0.18, -timeSeconds * 0.11);
+    vec2 mediumWaves = waveCoords * 0.11 + vec2(-timeSeconds * 0.24, timeSeconds * 0.33);
+    vec2 detailWaves = waveCoords * 0.21 + vec2(timeSeconds * 0.62, timeSeconds * 0.41);
 
-    vec2 waveTilt = vec2(slowWaves * 0.35 + choppy * 0.15, fastWaves * 0.25 + choppy * 0.25);
+    float slowBands = sin(largeWaves.x) + sin(largeWaves.y);
+    float rolling = sin(dot(mediumWaves, vec2(0.86, -1.12))) + sin(dot(mediumWaves, vec2(1.27, 0.74)));
+    float ripples = sin(detailWaves.x) + sin(detailWaves.y + 1.3);
+
+    vec2 waveTilt = vec2(slowBands * 0.16 + rolling * 0.08, rolling * 0.12 + ripples * 0.06);
     vec3 bumped = normalize(normal + tangent * waveTilt.x + bitangent * waveTilt.y);
     return bumped;
 }
@@ -122,9 +126,9 @@ vec3 shadeWater(
     vec3 ambientReflection = ambientLight * (0.25 + 0.35 * (1.0 - absorption));
     vec3 color = mix(transmitted + inScattering, reflected + ambientReflection, fresnel);
 
-    float highlight = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 48.0) * shadow;
-    float sparkle = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 96.0) * 0.25;
-    color += (highlight * mix(0.08, 0.35, scatterAmount) + sparkle) * sunColor;
+    float highlight = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 28.0) * shadow;
+    float sparkle = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 72.0) * 0.2;
+    color += (highlight * mix(0.08, 0.32, scatterAmount) + sparkle) * sunColor;
 
     return color;
 }

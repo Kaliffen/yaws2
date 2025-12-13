@@ -278,7 +278,7 @@ void main() {
         posPlanet = ro + rd * waterSurfaceT;
         normalPlanet = normalize(posPlanet);
         heightValue = terrainHeight(normalPlanet * planetRadius);
-        baseColor = waterColor;
+        baseColor = landColor(normalPlanet * planetRadius, normalPlanet, heightValue);
         waterFlag = 1.0;
     } else if (hit) {
         float d0 = planetSDF(posPlanet);

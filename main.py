@@ -341,24 +341,37 @@ def main():
 
     prev_planet_to_world = renderer.planet_to_world.copy()
     prev_world_to_planet = renderer.world_to_planet.copy()
+    first_spin_sample = True
 
     while not glfw.window_should_close(window):
         dt = timer.get_delta()
         calendar_state = calendar.advance(dt, editing_params.time_speed)
         renderer.prepare_frame_state(calendar_state)
-        spin_delta = renderer.planet_to_world @ prev_world_to_planet
+        if first_spin_sample:
+            spin_delta = np.identity(3, dtype=np.float32)
+            prev_planet_to_world = renderer.planet_to_world.copy()
+            prev_world_to_planet = renderer.world_to_planet.copy()
+            first_spin_sample = False
+        else:
+            spin_delta = renderer.planet_to_world @ prev_world_to_planet
         glfw.poll_events()
         imgui_renderer.process_inputs()
         imgui.new_frame()
 
         io = imgui.get_io()
 
-        if gravity_enabled:
-            camera.position = spin_delta @ camera.position
-            camera.velocity = spin_delta @ camera.velocity
-
         surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
         in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
+
+        grounded = (
+            surface_info is not None
+            and surface_info["altitude"] <= min_ground_clearance + 0.1
+        )
+        if gravity_enabled and in_atmosphere and grounded:
+            camera.position = spin_delta @ camera.position
+            camera.velocity = spin_delta @ camera.velocity
+            surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
+            in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
 
         if gravity_enabled and in_atmosphere and surface_info is not None:
             camera.set_reference_up(surface_info["normal"])

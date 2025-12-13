@@ -319,7 +319,7 @@ void main() {
     float atmExit = 0.0;
     if (throughAtmosphere) {
         atmEntry = max(tAtm0, 0.0);
-        atmExit = min(tAtm1, maxRayDistance);
+        atmExit = min(tAtm1, viewDistance);
     }
 
     gPositionHeight = vec4(posWorld, heightValue);

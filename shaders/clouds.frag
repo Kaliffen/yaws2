@@ -21,6 +21,7 @@ uniform float cloudLayerThickness;
 uniform float cloudCoverage;
 uniform float cloudDensity;
 uniform float cloudWorldCoverage;
+uniform float cloudDrawDistance;
 uniform vec3 cloudLightColor;
 uniform float maxRayDistance;
 uniform float aspect;
@@ -105,10 +106,13 @@ float cloudCoverageField(vec3 dir) {
 
     float base = fbm(lookup);
     float billow = 1.0 - abs(fbm(lookup * 1.9 + vec3(-2.0, 3.1, 0.5)) * 2.0 - 1.0);
-    float coverage = mix(base, billow, 0.55);
-    coverage = coverage * (cloudCoverage + 0.35) + 0.15;
-    coverage *= cloudWorldCoverage;
-    return clamp(smoothstep(0.28, 0.68, coverage), 0.0, 1.0);
+    float tuft = fbm(lookup * 3.8 + vec3(2.2, 1.4, -3.1));
+    float coverage = mix(base, billow, 0.52);
+    coverage = mix(coverage, tuft, 0.32);
+    coverage = coverage * (cloudCoverage + 0.55) + 0.25;
+    coverage *= (0.85 + cloudWorldCoverage * 0.65);
+    coverage = clamp(coverage, 0.0, 1.0);
+    return clamp(smoothstep(0.2, 0.75, coverage), 0.0, 1.0);
 }
 
 float cloudShapeNoise(vec3 p) {
@@ -264,7 +268,16 @@ void main() {
     float surfaceDistance = viewData.x;
     float distanceLod = computeDistanceLod(surfaceDistance);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
-    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a, distanceLod, jitter);
+    float cappedDistance = min(surfaceDistance, cloudDrawDistance);
+    if (cappedDistance <= 0.0) {
+        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
+    float distanceFade = 1.0 - smoothstep(cloudDrawDistance * 0.7, cloudDrawDistance, surfaceDistance);
+    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, cappedDistance, material.a, distanceLod, jitter);
+    clouds.rgb *= distanceFade;
+    clouds.a = mix(1.0, clouds.a, distanceFade);
 
     FragColor = clouds;
 }

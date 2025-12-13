@@ -128,6 +128,12 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
     _, editing_params.cloud_world_coverage = imgui.slider_float(
         "Cloud world coverage", editing_params.cloud_world_coverage, 0.0, 2.0
     )
+    _, editing_params.cloud_draw_distance_factor = imgui.slider_float(
+        "Cloud draw distance (x planet radius)", editing_params.cloud_draw_distance_factor, 0.3, 2.5
+    )
+    editing_params.cloud_draw_distance = (
+        editing_params.planet_radius * editing_params.cloud_draw_distance_factor
+    )
     _, editing_params.cloud_density = imgui.slider_float(
         "Cloud density", editing_params.cloud_density, 0.0, 1.0
     )

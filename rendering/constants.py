@@ -55,9 +55,10 @@ _BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS
 
 CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
 CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
-CLOUD_COVERAGE = 0.44
-CLOUD_WORLD_COVERAGE = 1.0
+CLOUD_COVERAGE = 0.58
+CLOUD_WORLD_COVERAGE = 1.15
 CLOUD_DENSITY = 0.45
+CLOUD_DRAW_DISTANCE_FACTOR = 1.4
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
 
 # Raymarch controls
@@ -101,6 +102,8 @@ class PlanetParameters:
     cloud_coverage: float = CLOUD_COVERAGE
     cloud_world_coverage: float = CLOUD_WORLD_COVERAGE
     cloud_density: float = CLOUD_DENSITY
+    cloud_draw_distance_factor: float = CLOUD_DRAW_DISTANCE_FACTOR
+    cloud_draw_distance: float = PLANET_RADIUS * CLOUD_DRAW_DISTANCE_FACTOR
     cloud_light_color: np.ndarray = field(default_factory=lambda: _copy_vector(CLOUD_LIGHT_COLOR))
     planet_max_steps: int = PLANET_MAX_STEPS
     planet_step_scale: float = PLANET_STEP_SCALE
@@ -128,6 +131,7 @@ class PlanetParameters:
             else MAX_RAY_DISTANCE_FACTOR
         )
         self.max_ray_distance = self.planet_radius * max_ray_distance_factor
+        self.cloud_draw_distance = self.planet_radius * self.cloud_draw_distance_factor
 
     def copy(self) -> "PlanetParameters":
         return PlanetParameters(
@@ -148,6 +152,8 @@ class PlanetParameters:
             cloud_coverage=self.cloud_coverage,
             cloud_world_coverage=self.cloud_world_coverage,
             cloud_density=self.cloud_density,
+            cloud_draw_distance_factor=self.cloud_draw_distance_factor,
+            cloud_draw_distance=self.cloud_draw_distance,
             cloud_light_color=_copy_vector(self.cloud_light_color),
             planet_max_steps=self.planet_max_steps,
             planet_step_scale=self.planet_step_scale,

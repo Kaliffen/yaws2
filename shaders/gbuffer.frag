@@ -74,10 +74,12 @@ float fbm(vec3 p) {
 float cloudCoverageField(vec3 dir) {
     float bands = fbm(dir * 3.1 + vec3(1.7, -2.2, 0.5));
     float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
-    float coverage = bands * 0.65 + streaks * 0.45;
-    coverage = coverage * cloudCoverage + 0.12;
-    coverage *= cloudWorldCoverage;
-    return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
+    float puffs = fbm(dir * 12.5 + vec3(5.1, -1.9, 3.6));
+    float coverage = bands * 0.55 + streaks * 0.35 + puffs * 0.25;
+    coverage = coverage * (cloudCoverage + 0.55) + 0.25;
+    coverage *= (0.85 + cloudWorldCoverage * 0.65);
+    coverage = clamp(coverage, 0.0, 1.0);
+    return clamp(smoothstep(0.22, 0.72, coverage), 0.0, 1.0);
 }
 
 // Terrain Height and SDF

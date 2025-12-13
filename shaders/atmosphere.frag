@@ -6,6 +6,7 @@ in vec2 TexCoord;
 
 uniform sampler2D gPositionHeight;
 uniform sampler2D gNormalFlags;
+uniform sampler2D gViewData;
 
 uniform vec3 camPos;
 uniform vec3 camForward;
@@ -26,35 +27,8 @@ vec4 decodeNormalFlags(vec2 uv) {
     return texture(gNormalFlags, uv);
 }
 
-vec3 rayDirection(vec2 uv) {
-    uv = uv * 2.0 - 1.0;
-    uv.x *= aspect;
-    return normalize(camForward + uv.x * camRight + uv.y * camUp);
-}
-
-bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
-    float b = dot(ro, rd);
-    float c = dot(ro, ro) - R * R;
-    float h = b * b - c;
-    if (h < 0.0) return false;
-    h = sqrt(h);
-    t0 = -b - h;
-    t1 = -b + h;
-    return true;
-}
-
-vec2 rayAtmosphereSegment(vec3 rayOrigin, vec3 rayDir, float hitDistance) {
-    float t0, t1;
-    if (!intersectSphere(rayOrigin, rayDir, atmosphereRadius, t0, t1) || t1 <= 0.0) {
-        return vec2(-1.0);
-    }
-
-    if (t0 < 0.0) {
-        t0 = 0.0;
-    }
-
-    float maxTravel = (hitDistance > 0.0) ? min(hitDistance, t1) : t1;
-    return vec2(t0, maxTravel);
+vec3 decodeViewData(vec2 uv) {
+    return texture(gViewData, uv).xyz;
 }
 
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
@@ -74,12 +48,7 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     return mix(base, twilightColor, goldenBand * 0.18);
 }
 
-vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface) {
-    vec2 segment = rayAtmosphereSegment(rayOrigin, rayDir, hitSurface ? length(hitPos - rayOrigin) : -1.0);
-    if (segment.x < 0.0) {
-        return vec3(0.0);
-    }
-
+vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface, vec2 segment) {
     float pathLength = segment.y - segment.x;
     float viewHeight = max(length(rayOrigin) - planetRadius, 0.0);
     float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
@@ -116,12 +85,16 @@ void main() {
     vec3 pos = decodePosition(uv);
     vec4 normalFlags = decodeNormalFlags(uv);
     bool hit = normalFlags.w > -0.5;
+    vec3 viewData = decodeViewData(uv);
 
     vec3 camPlanet = worldToPlanet * camPos;
     vec3 posPlanet = worldToPlanet * pos;
-    vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
+    vec3 viewDirWorld = normalize(pos - camPos);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
-    vec3 atmosphere = computeAtmosphere(camPlanet, viewDirPlanet, posPlanet, hit);
+    vec2 atmosphereSegment = viewData.yz;
+    vec3 atmosphere = (atmosphereSegment.y > atmosphereSegment.x)
+        ? computeAtmosphere(camPlanet, viewDirPlanet, posPlanet, hit, atmosphereSegment)
+        : vec3(0.0);
 
     float opticalDepth = length(atmosphere);
     float transmittance = exp(-opticalDepth * 0.55);

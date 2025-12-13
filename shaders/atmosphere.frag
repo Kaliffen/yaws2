@@ -92,7 +92,7 @@ vec3 integrateSunTransmittance(vec3 start, vec3 lightDir) {
 vec4 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec2 segment) {
     float pathLength = segment.y - segment.x;
     if (pathLength <= 0.0) {
-        return vec4(0.0);
+        return vec4(0.0, 0.0, 0.0, 1.0);
     }
 
     vec3 lightDir = normalize(worldToPlanet * sunDir);

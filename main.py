@@ -347,7 +347,12 @@ def main():
 
         surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
         in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
-        if gravity_enabled and in_atmosphere:
+        is_grounded = (
+            surface_info is not None
+            and surface_info["altitude"] <= min_ground_clearance + 1e-4
+        )
+
+        if gravity_enabled and in_atmosphere and is_grounded:
             camera.position = spin_delta @ camera.position
             camera.velocity = spin_delta @ camera.velocity
             surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)

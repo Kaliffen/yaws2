@@ -26,6 +26,7 @@ uniform float planetMinStepFactor;
 uniform vec2 resolution;
 uniform mat3 planetToWorld;
 uniform mat3 worldToPlanet;
+uniform float timeSeconds;
 
 // Water Parameters
 uniform vec3 waterColor;
@@ -111,18 +112,36 @@ vec3 rayDirection(vec2 uv) {
     return normalize(camForward + uv.x * camRight + uv.y * camUp);
 }
 
-bool marchPlanet(vec3 ro, vec3 rd, out vec3 pos, out float t) {
-    t = 0.0;
+float interleavedGradientNoise(vec2 pixel) {
+    float f = dot(pixel, vec2(0.06711056, 0.00583715));
+    return fract(52.9829189 * fract(f));
+}
+
+float computeLodFactor(vec3 ro, vec3 rd) {
+    float altitude = max(length(ro) - planetRadius, 0.0);
+    float distanceLod = log2(1.0 + altitude / max(planetRadius, 0.0001));
+    float horizonAlign = pow(1.0 - abs(dot(normalize(ro), rd)), 2.2);
+    return clamp(mix(distanceLod, distanceLod + horizonAlign * 0.5, 0.65), 0.0, 1.0);
+}
+
+bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, out vec3 pos, out float t) {
+    int stepBudget = int(mix(float(planetMaxSteps), float(planetMaxSteps) * 0.55, lodFactor));
+    stepBudget = max(stepBudget, 1);
+
+    float adaptiveScale = mix(planetStepScale * 0.65, planetStepScale * 1.85, lodFactor);
+    float minStep = mix(planetMinStepFactor * 0.65, planetMinStepFactor * 1.5, lodFactor);
+
     float eps = max(heightScale * 0.01, planetRadius * 0.0001);
+    t = eps * jitter;
     for (int i = 0; i < 1024; i++) {
-        if (i >= planetMaxSteps) break;
+        if (i >= stepBudget) break;
         vec3 p = ro + rd * t;
         float d = planetSDF(p);
         if (d < eps) {
             pos = p;
             return true;
         }
-        t += max(d * planetStepScale, eps * planetMinStepFactor);
+        t += max(d * adaptiveScale, eps * minStep);
         if (t > maxRayDistance) break;
     }
     return false;
@@ -192,9 +211,12 @@ void main() {
     vec3 ro = worldToPlanet * roWorld;
     vec3 rd = worldToPlanet * rdWorld;
 
+    float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
+    float lodFactor = computeLodFactor(ro, rd);
+
     vec3 posPlanet = vec3(0.0);
     float t;
-    bool hit = marchPlanet(ro, rd, posPlanet, t);
+    bool hit = marchPlanet(ro, rd, lodFactor, jitter, posPlanet, t);
 
     float waterRadius = planetRadius + seaLevel;
     float t0, t1;

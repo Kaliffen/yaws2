@@ -20,11 +20,14 @@ uniform float aspect;
 uniform mat3 worldToPlanet;
 
 const float PI = 3.14159265359;
-const float RAYLEIGH_SCALE_HEIGHT = 8000.0;
-const float MIE_SCALE_HEIGHT = 1200.0;
+// Distances in the engine are expressed in kilometers. Use kilometer-based
+// scale heights and scattering coefficients so optical depth math remains
+// physically reasonable and produces visible sky color.
+const float RAYLEIGH_SCALE_HEIGHT = 8.0;
+const float MIE_SCALE_HEIGHT = 1.2;
 const float HG_G = 0.76;
-const vec3 BETA_RAYLEIGH = vec3(5.8e-6, 13.5e-6, 33.1e-6);
-const vec3 BETA_MIE = vec3(2.1e-5);
+const vec3 BETA_RAYLEIGH = vec3(5.8e-3, 13.5e-3, 33.1e-3);
+const vec3 BETA_MIE = vec3(2.1e-2);
 
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;

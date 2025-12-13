@@ -13,6 +13,7 @@ uniform vec3 camUp;
 uniform vec3 sunDir;
 uniform float sunPower;
 uniform float aspect;
+uniform float tanHalfFov;
 
 // Planet Parameters
 uniform float planetRadius;
@@ -109,6 +110,7 @@ float planetSDF(vec3 p) {
 
 vec3 rayDirection(vec2 uv) {
     uv.x *= aspect;
+    uv *= tanHalfFov;
     return normalize(camForward + uv.x * camRight + uv.y * camUp);
 }
 

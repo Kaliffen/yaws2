@@ -154,6 +154,7 @@ def draw_performance_panel(
     gravity_enabled: bool,
     player_height: float,
     min_ground_clearance: float,
+    camera_fov_degrees: float,
 ):
     io = imgui.get_io()
     left_panel_width = max(io.display_size.x * 0.28, 340.0)
@@ -225,12 +226,15 @@ def draw_performance_panel(
     _, min_ground_clearance = imgui.input_float(
         "Min ground clearance (m)", min_ground_clearance, step=0.01, step_fast=0.1
     )
+    _, camera_fov_degrees = imgui.slider_float(
+        "Camera FOV (deg)", camera_fov_degrees, 35.0, 120.0
+    )
     gravity_clicked = imgui.button("Gravity (G)", width=140)
     imgui.same_line()
     imgui.text("On" if gravity_enabled else "Off")
 
     imgui.end()
-    return gravity_clicked, max(min_ground_clearance, 0.0)
+    return gravity_clicked, max(min_ground_clearance, 0.0), camera_fov_degrees
 
 
 def main():
@@ -295,6 +299,7 @@ def main():
     base_speed = 60.0 * SCALAR
     camera.speed = base_speed
     camera.min_radius = None
+    camera.enable_reference_alignment(False)
 
     renderer = PlanetRenderer(
         gbuffer_program,
@@ -348,10 +353,14 @@ def main():
             camera.velocity = spin_delta @ camera.velocity
             surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
 
-        if gravity_enabled and in_atmosphere and surface_info is not None:
-            camera.set_reference_up(surface_info["normal"])
+        if gravity_enabled and in_atmosphere:
+            camera.enable_reference_alignment(True)
+            if surface_info is not None:
+                camera.set_reference_up(surface_info["normal"])
+            else:
+                camera.set_reference_up(WORLD_UP)
         else:
-            camera.set_reference_up(WORLD_UP)
+            camera.enable_reference_alignment(False)
         camera.update_vectors()
 
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
@@ -372,6 +381,12 @@ def main():
         g_down = glfw.get_key(window, glfw.KEY_G) == glfw.PRESS
         if g_down and not g_pressed:
             gravity_enabled = not gravity_enabled
+            if gravity_enabled and in_atmosphere and surface_info is not None:
+                camera.enable_reference_alignment(True)
+                camera.set_reference_up(surface_info["normal"])
+            else:
+                camera.enable_reference_alignment(False)
+            camera.update_vectors()
         g_pressed = g_down
 
         # Mouse look when in camera mode
@@ -424,6 +439,11 @@ def main():
                     camera.process_movement("LEFT", dt)
                 if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
                     camera.process_movement("RIGHT", dt)
+                if not gravity_enabled:
+                    if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
+                        camera.process_roll("LEFT", dt)
+                    if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:
+                        camera.process_roll("RIGHT", dt)
 
             for idx, key in enumerate([
                 glfw.KEY_1,
@@ -456,29 +476,36 @@ def main():
 
         player_height = max(surface_info["altitude"], 0.0) if surface_info is not None else 0.0
         in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
-        if gravity_enabled and in_atmosphere and surface_info is not None:
-            camera.set_reference_up(surface_info["normal"])
+        if gravity_enabled and in_atmosphere:
+            camera.enable_reference_alignment(True)
+            if surface_info is not None:
+                camera.set_reference_up(surface_info["normal"])
+            else:
+                camera.set_reference_up(WORLD_UP)
         else:
-            camera.set_reference_up(WORLD_UP)
+            camera.enable_reference_alignment(False)
         camera.update_vectors()
 
         framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
         width, height = framebuffer_width or width, framebuffer_height or height
 
-        gravity_clicked, min_ground_clearance = draw_performance_panel(
+        gravity_clicked, min_ground_clearance, camera_fov = draw_performance_panel(
             editing_params,
             calendar_state,
             calendar.days_in_year,
             gravity_enabled,
             player_height,
             min_ground_clearance,
+            camera.fov_degrees,
         )
+        camera.fov_degrees = camera_fov
         if gravity_clicked:
             gravity_enabled = not gravity_enabled
             if gravity_enabled and in_atmosphere and surface_info is not None:
+                camera.enable_reference_alignment(True)
                 camera.set_reference_up(surface_info["normal"])
             else:
-                camera.set_reference_up(WORLD_UP)
+                camera.enable_reference_alignment(False)
             camera.update_vectors()
         update_clicked, reset_clicked = draw_parameter_panel(editing_params, current_sun_direction)
 
@@ -501,6 +528,7 @@ def main():
             camera.front,
             camera.right,
             camera.up,
+            camera.fov_degrees,
             width,
             height,
             debug_level,

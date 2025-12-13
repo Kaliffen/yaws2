@@ -27,21 +27,9 @@ vec3 buildTangent(vec3 n) {
 }
 
 vec3 waterSurfaceNormal(vec3 pos, vec3 normal) {
-    vec3 tangent = buildTangent(normal);
-    vec3 bitangent = normalize(cross(normal, tangent));
-
-    vec2 waveCoords = vec2(dot(pos, tangent), dot(pos, bitangent));
-    vec2 largeWaves = waveCoords * 0.055 + vec2(timeSeconds * 0.18, -timeSeconds * 0.11);
-    vec2 mediumWaves = waveCoords * 0.11 + vec2(-timeSeconds * 0.24, timeSeconds * 0.33);
-    vec2 detailWaves = waveCoords * 0.21 + vec2(timeSeconds * 0.62, timeSeconds * 0.41);
-
-    float slowBands = sin(largeWaves.x) + sin(largeWaves.y);
-    float rolling = sin(dot(mediumWaves, vec2(0.86, -1.12))) + sin(dot(mediumWaves, vec2(1.27, 0.74)));
-    float ripples = sin(detailWaves.x) + sin(detailWaves.y + 1.3);
-
-    vec2 waveTilt = vec2(slowBands * 0.16 + rolling * 0.08, rolling * 0.12 + ripples * 0.06);
-    vec3 bumped = normalize(normal + tangent * waveTilt.x + bitangent * waveTilt.y);
-    return bumped;
+    // Keep the water surface simple: no animated ripples or multi-scale bumps,
+    // just the geometric normal.
+    return normal;
 }
 
 vec3 decodePosition(vec2 uv) {
@@ -106,29 +94,21 @@ vec3 shadeWater(
     float viewFacing = max(dot(surfaceNormal, viewDir), 0.0);
     float entryCos = max(dot(surfaceNormal, -viewDir), 0.05);
 
-    // Beer-Lambert attenuation scaled by incidence angle so grazing views
-    // travel through more water and darken appropriately.
+    // Simple Beer-Lambert absorption through the water volume.
     float pathLength = depth / entryCos + viewWaterThickness;
-    float absorption = exp(-waterAbsorption * pathLength * 0.42);
+    float absorption = exp(-waterAbsorption * pathLength * 0.45);
 
-    // Forward scattering brightens water that looks toward the sun.
-    float forward = pow(max(dot(viewDir, lightDir), 0.0), 4.0);
-    float scatterAmount = mix(0.12, 0.75, waterScattering);
-    float sunFacing = ndl * 0.6 + forward;
-    vec3 inScattering = waterColor * (1.0 - absorption) * (0.25 + scatterAmount * sunFacing) * (sunColor * shadow + ambientLight);
+    // Slightly darken the seabed so it peeks through the water more subtly.
+    vec3 seabedColor = floorColor * 0.8;
+    vec3 transmitted = seabedColor * absorption + waterColor * (1.0 - absorption) * 0.15;
 
-    float bedDarken = smoothstep(0.0, 80.0, depth);
-    vec3 transmitted = floorColor * absorption * mix(1.0, 0.25, bedDarken);
-    vec3 reflected = mix(waterColor, sunColor, 0.25) * (0.35 + 0.65 * ndl * shadow);
-
+    // Modest reflection using Schlick Fresnel and a calm highlight.
     float fresnel = 0.02 + pow(1.0 - viewFacing, 5.0);
+    vec3 reflected = mix(waterColor, sunColor, 0.2) * (shadow * ndl + ambientLight * 0.35);
+    float spec = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 32.0) * shadow;
 
-    vec3 ambientReflection = ambientLight * (0.25 + 0.35 * (1.0 - absorption));
-    vec3 color = mix(transmitted + inScattering, reflected + ambientReflection, fresnel);
-
-    float highlight = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 28.0) * shadow;
-    float sparkle = pow(max(dot(reflect(-lightDir, surfaceNormal), viewDir), 0.0), 72.0) * 0.2;
-    color += (highlight * mix(0.08, 0.32, scatterAmount) + sparkle) * sunColor;
+    vec3 color = mix(transmitted, reflected, fresnel);
+    color += spec * sunColor * 0.12;
 
     return color;
 }

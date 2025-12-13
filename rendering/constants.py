@@ -69,6 +69,10 @@ CLOUD_EXTINCTION = 0.55
 CLOUD_PHASE_EXPONENT = 2.5
 CLOUD_ANIMATION_SPEED = 0.006
 
+# Post process parameters
+EXPOSURE = 1.1
+GAMMA = 2.2
+
 # Planet orientation
 TILT_DEGREES = 23.5
 TIME_SPEED = 240.0
@@ -107,6 +111,8 @@ class PlanetParameters:
     cloud_extinction: float = CLOUD_EXTINCTION
     cloud_phase_exponent: float = CLOUD_PHASE_EXPONENT
     cloud_animation_speed: float = CLOUD_ANIMATION_SPEED
+    exposure: float = EXPOSURE
+    gamma: float = GAMMA
     tilt_degrees: float = TILT_DEGREES
     time_speed: float = TIME_SPEED
 
@@ -153,6 +159,8 @@ class PlanetParameters:
             cloud_extinction=self.cloud_extinction,
             cloud_phase_exponent=self.cloud_phase_exponent,
             cloud_animation_speed=self.cloud_animation_speed,
+            exposure=self.exposure,
+            gamma=self.gamma,
             sun_power=self.sun_power,
             tilt_degrees=self.tilt_degrees,
             time_speed=self.time_speed,

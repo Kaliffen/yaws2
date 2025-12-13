@@ -134,6 +134,11 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
     if changed:
         editing_params.cloud_light_color = np.array(cloud_light, dtype=np.float32)
 
+    imgui.separator()
+    imgui.text("Post process")
+    _, editing_params.exposure = imgui.slider_float("Exposure", editing_params.exposure, 0.1, 4.0)
+    _, editing_params.gamma = imgui.slider_float("Gamma", editing_params.gamma, 1.2, 3.2)
+
     update_clicked = False
     reset_clicked = False
 
@@ -270,6 +275,8 @@ def main():
         cloud_src = f.read()
     with open("shaders/composite.frag") as f:
         composite_src = f.read()
+    with open("shaders/postprocess.frag") as f:
+        postprocess_src = f.read()
     with open("shaders/surface_info.comp") as f:
         surface_info_src = f.read()
 
@@ -278,6 +285,7 @@ def main():
     atmosphere_program = create_program(vert_src, atmosphere_src)
     cloud_program = create_program(vert_src, cloud_src)
     composite_program = create_program(vert_src, composite_src)
+    postprocess_program = create_program(vert_src, postprocess_src)
     surface_info_program = create_compute_program(surface_info_src)
 
     glUseProgram(gbuffer_program)
@@ -302,6 +310,7 @@ def main():
         atmosphere_program,
         cloud_program,
         composite_program,
+        postprocess_program,
         surface_info_program,
         parameters,
     )

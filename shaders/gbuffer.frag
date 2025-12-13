@@ -80,6 +80,9 @@ float cloudCoverageField(vec3 dir) {
 // Terrain Height and SDF
 float terrainHeight(vec3 p) {
     vec3 scaledP = p / planetRadius;
+    float altitude = max(length(p) - planetRadius, 0.0);
+    float detailFade = clamp(1.0 - altitude / max(heightScale * 6.0, 0.0001), 0.0, 1.0);
+    float octaveBudget = mix(2.0, 5.0, detailFade);
 
     float warpFreq = 1.15;
     float warpAmp = 0.06;
@@ -93,7 +96,12 @@ float terrainHeight(vec3 p) {
     vec3 warpedP = scaledP * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
 
     float base = fbm(warpedP);
-    float detail = fbm(warpedP * 2.5) * 0.35;
+    float detail = 0.0;
+
+    for (int i = 0; i < 3; ++i) {
+        if (float(i) > octaveBudget - 3.0) break;
+        detail += fbm(warpedP * (2.5 + float(i))) * 0.12;
+    }
 
     float normalized = base * 0.62 + detail * 0.38;
     // Bias the terrain downward so a portion of the surface sits below sea level,
@@ -132,16 +140,25 @@ bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, float tMin, fl
     float minStep = mix(planetMinStepFactor * 0.65, planetMinStepFactor * 1.5, lodFactor);
 
     float eps = max(heightScale * 0.01, planetRadius * 0.0001);
+    float shellSlack = max(heightScale * 1.1, planetRadius * 0.001);
     t = tMin + eps * jitter;
     for (int i = 0; i < 1024; i++) {
         if (i >= stepBudget) break;
         vec3 p = ro + rd * t;
+        float sphereD = length(p) - (planetRadius + shellSlack);
+        if (sphereD > shellSlack * 0.5) {
+            t += max(sphereD * adaptiveScale, eps * minStep);
+            if (t > tMax) break;
+            continue;
+        }
+
         float d = planetSDF(p);
         if (d < eps) {
             pos = p;
             return true;
         }
-        t += max(d * adaptiveScale, eps * minStep);
+        float stepDist = max(d * adaptiveScale, eps * minStep);
+        t += stepDist * 0.9;
         if (t > tMax) break;
     }
     return false;

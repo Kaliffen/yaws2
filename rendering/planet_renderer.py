@@ -15,6 +15,7 @@ class PlanetRenderer:
         atmosphere_program,
         cloud_program,
         composite_program,
+        postprocess_program,
         surface_info_program,
         parameters: PlanetParameters,
     ):
@@ -23,12 +24,14 @@ class PlanetRenderer:
         self.atmosphere_program = atmosphere_program
         self.cloud_program = cloud_program
         self.composite_program = composite_program
+        self.postprocess_program = postprocess_program
         self.surface_info_program = surface_info_program
         self.parameters = parameters
         self.gbuffer = None
         self.lighting_buffer = None
         self.atmosphere_buffer = None
         self.cloud_buffer = None
+        self.composite_buffer = None
         self.surface_info_buffer = None
         self.cam_pos = None
         self.cam_forward = None
@@ -96,6 +99,7 @@ class PlanetRenderer:
         self.lighting_buffer = create_color_fbo(width, height)
         self.atmosphere_buffer = create_color_fbo(width, height)
         self.cloud_buffer = create_color_fbo(width, height)
+        self.composite_buffer = create_color_fbo(width, height)
 
     def _bind_common_uniforms(self, program, width, height):
         set_vec3(program, "camPos", self.cam_pos)
@@ -273,10 +277,10 @@ class PlanetRenderer:
 
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
-        # Pass 5: composite and debug layers
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # Pass 5: composite and debug layers into HDR buffer
+        glBindFramebuffer(GL_FRAMEBUFFER, self.composite_buffer["fbo"])
         glViewport(0, 0, width, height)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT)
 
         glUseProgram(self.composite_program)
         self._bind_common_uniforms(self.composite_program, width, height)
@@ -310,5 +314,19 @@ class PlanetRenderer:
         set_int(self.composite_program, "gViewData", 6)
 
         set_int(self.composite_program, "debugLevel", debug_level)
+
+        glDrawArrays(GL_TRIANGLES, 0, 6)
+
+        # Pass 6: post process (HDR + tonemapping)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glViewport(0, 0, width, height)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        glUseProgram(self.postprocess_program)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.composite_buffer["textures"][0])
+        set_int(self.postprocess_program, "hdrColor", 0)
+        set_float(self.postprocess_program, "exposure", self.parameters.exposure)
+        set_float(self.postprocess_program, "gamma", self.parameters.gamma)
 
         glDrawArrays(GL_TRIANGLES, 0, 6)

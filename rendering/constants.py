@@ -6,34 +6,34 @@ import numpy as np
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 SUN_POWER = 1.5
 
-# Base scale values for the planet and atmosphere (kilometers)
-# Use a realistic Earth-sized radius so the horizon and curvature feel correct
-# when flying close to the surface.
-PLANET_RADIUS = 6371.0
+# Base scale values for the planet and atmosphere (meters)
+# Use Earth scale values so curvature, horizon distance, and atmosphere thickness
+# align with real-world expectations.
+PLANET_RADIUS = 6_371_000.0
 
 # Express atmospheric and cloud heights as percentages of the planet radius
-# or atmosphere thickness so they automatically scale. A thinner 3% shell keeps
-# the atmosphere more believable while still visible at a distance, and the
-# cloud band lives comfortably within that shell.
-ATMOSPHERE_THICKNESS_PERCENT = 4.0
+# or atmosphere thickness so they automatically scale. A ~1.6% shell places the
+# top of the atmosphere near 100 km, and the cloud band sits a few kilometers
+# above the surface.
+ATMOSPHERE_THICKNESS_PERCENT = 1.6
 ATMOSPHERE_THICKNESS_RATIO = ATMOSPHERE_THICKNESS_PERCENT / 100.0
 _BASELINE_ATMOSPHERE_THICKNESS = PLANET_RADIUS * ATMOSPHERE_THICKNESS_RATIO
-CLOUD_BASE_PERCENT = 45.0
-CLOUD_LAYER_THICKNESS_PERCENT = 35.0
+CLOUD_BASE_PERCENT = 2.0
+CLOUD_LAYER_THICKNESS_PERCENT = 3.0
 CLOUD_BASE_ALTITUDE_RATIO = CLOUD_BASE_PERCENT / 100.0
 CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 
 ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 532.2
+# exaggerated features, but still allow visible mountain ranges (on the order of
+# Everest's height).
+HEIGHT_SCALE = 9000.0
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional
-# multiplier so the shader math stays consistent. A small positive offset keeps
-# shallow coastlines without burying continents.
-SEA_LEVEL = 0.0  # kilometers above the planet radius
+# multiplier so the shader math stays consistent.
+SEA_LEVEL = 0.0  # meters above the planet radius
 # Slightly brighter water with a touch more scattering makes oceans stand out
 # against land.
 WATER_COLOR = np.array([0.02, 0.16, 0.24], dtype=np.float32)

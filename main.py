@@ -10,6 +10,7 @@ from gl_utils.camera import FPSCamera, normalize, WORLD_UP
 from rendering.constants import PlanetParameters, default_planet_parameters, SCALAR
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer, PlanetCalendar
+from utils.persistence import load_camera_bookmark, save_camera_bookmark
 
 
 def compute_adaptive_speed(position, base_speed, planet_radius):
@@ -151,10 +152,13 @@ def draw_performance_panel(
     editing_params: PlanetParameters,
     calendar_state,
     days_in_year: int,
+    hours_per_day: int,
     gravity_enabled: bool,
     player_height: float,
     min_ground_clearance: float,
     camera_fov_degrees: float,
+    calendar_edit_state: dict,
+    bookmark_available: bool,
 ):
     io = imgui.get_io()
     left_panel_width = max(io.display_size.x * 0.28, 340.0)
@@ -179,10 +183,41 @@ def draw_performance_panel(
     imgui.text(
         f"Time {calendar_state.hour:02d}:{calendar_state.minute:02d}:{calendar_state.second:02d}"
     )
+    imgui.text("Set clock")
+    day_changed, calendar_edit_state["day"] = imgui.input_int(
+        "Day (1-indexed)", calendar_edit_state.get("day", calendar_state.day_index + 1), step=1
+    )
+    hour_changed, calendar_edit_state["hour"] = imgui.slider_int(
+        "Hour", calendar_edit_state.get("hour", calendar_state.hour), 0, hours_per_day - 1
+    )
+    minute_changed, calendar_edit_state["minute"] = imgui.slider_int(
+        "Minute", calendar_edit_state.get("minute", calendar_state.minute), 0, 59
+    )
+    second_changed, calendar_edit_state["second"] = imgui.slider_int(
+        "Second", calendar_edit_state.get("second", calendar_state.second), 0, 59
+    )
+    if day_changed:
+        calendar_edit_state["day"] = max(1, min(days_in_year, calendar_edit_state["day"]))
+    if hour_changed:
+        calendar_edit_state["hour"] = max(0, min(hours_per_day - 1, calendar_edit_state["hour"]))
+    if minute_changed:
+        calendar_edit_state["minute"] = max(0, min(59, calendar_edit_state["minute"]))
+    if second_changed:
+        calendar_edit_state["second"] = max(0, min(59, calendar_edit_state["second"]))
+    set_clock_clicked = imgui.button("Set calendar time", width=180)
+    imgui.same_line()
+    sync_clock_clicked = imgui.button("Use current time", width=180)
     _, editing_params.time_speed = imgui.input_float(
         "Time speed (x realtime)", editing_params.time_speed, step=0.5, step_fast=5.0
     )
     editing_params.time_speed = max(editing_params.time_speed, 0.0)
+    imgui.separator()
+
+    imgui.text("Camera bookmark")
+    save_bookmark_clicked = imgui.button("Save camera bookmark", width=200)
+    if bookmark_available:
+        imgui.same_line()
+        imgui.text_disabled("Loaded on start")
     imgui.separator()
 
     imgui.text("Ray distances")
@@ -234,7 +269,14 @@ def draw_performance_panel(
     imgui.text("On" if gravity_enabled else "Off")
 
     imgui.end()
-    return gravity_clicked, max(min_ground_clearance, 0.0), camera_fov_degrees
+    return (
+        gravity_clicked,
+        max(min_ground_clearance, 0.0),
+        camera_fov_degrees,
+        set_clock_clicked,
+        sync_clock_clicked,
+        save_bookmark_clicked,
+    )
 
 
 def main():
@@ -301,6 +343,17 @@ def main():
     camera.min_radius = None
     camera.enable_reference_alignment(False)
 
+    bookmark_loaded = False
+    bookmark = load_camera_bookmark()
+    if bookmark is not None:
+        camera.position = bookmark["position"].astype(np.float32)
+        camera.yaw = bookmark["yaw"]
+        camera.pitch = bookmark["pitch"]
+        camera.roll = bookmark["roll"]
+        camera.fov_degrees = bookmark["fov"]
+        camera.update_vectors()
+        bookmark_loaded = True
+
     renderer = PlanetRenderer(
         gbuffer_program,
         lighting_program,
@@ -312,6 +365,13 @@ def main():
     )
     timer = DeltaTimer()
     calendar = PlanetCalendar()
+    calendar_state = calendar.current_state()
+    calendar_edit_state = {
+        "day": calendar_state.day_index + 1,
+        "hour": calendar_state.hour,
+        "minute": calendar_state.minute,
+        "second": calendar_state.second,
+    }
 
     debug_level = 9
     pressed_state = [False] * 9
@@ -489,16 +549,55 @@ def main():
         framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
         width, height = framebuffer_width or width, framebuffer_height or height
 
-        gravity_clicked, min_ground_clearance, camera_fov = draw_performance_panel(
+        (
+            gravity_clicked,
+            min_ground_clearance,
+            camera_fov,
+            set_clock_clicked,
+            sync_clock_clicked,
+            save_bookmark_clicked,
+        ) = draw_performance_panel(
             editing_params,
             calendar_state,
             calendar.days_in_year,
+            calendar.hours_per_day,
             gravity_enabled,
             player_height,
             min_ground_clearance,
             camera.fov_degrees,
+            calendar_edit_state,
+            bookmark_loaded,
         )
         camera.fov_degrees = camera_fov
+        if sync_clock_clicked:
+            calendar_edit_state.update(
+                {
+                    "day": calendar_state.day_index + 1,
+                    "hour": calendar_state.hour,
+                    "minute": calendar_state.minute,
+                    "second": calendar_state.second,
+                }
+            )
+        if set_clock_clicked:
+            target_day = max(1, min(calendar.days_in_year, calendar_edit_state.get("day", 1)))
+            calendar_state = calendar.set_time(
+                target_day - 1,
+                int(calendar_edit_state.get("hour", 0)),
+                int(calendar_edit_state.get("minute", 0)),
+                int(calendar_edit_state.get("second", 0)),
+            )
+            renderer.prepare_frame_state(calendar_state)
+            current_sun_direction = renderer.sun_direction
+            calendar_edit_state.update(
+                {
+                    "day": calendar_state.day_index + 1,
+                    "hour": calendar_state.hour,
+                    "minute": calendar_state.minute,
+                    "second": calendar_state.second,
+                }
+            )
+        if save_bookmark_clicked:
+            bookmark_loaded = save_camera_bookmark(camera) or bookmark_loaded
         if gravity_clicked:
             gravity_enabled = not gravity_enabled
             if gravity_enabled and in_atmosphere and surface_info is not None:

@@ -6,10 +6,10 @@ import numpy as np
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 SUN_POWER = 1.5
 
-# Base scale values for the planet and atmosphere (kilometers)
+# Base scale values for the planet and atmosphere (meters)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct
 # when flying close to the surface.
-PLANET_RADIUS = 6371.0
+PLANET_RADIUS = 6_371_000.0
 
 # Express atmospheric and cloud heights as percentages of the planet radius
 # or atmosphere thickness so they automatically scale. A thinner 3% shell keeps
@@ -27,13 +27,13 @@ ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
 # exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 532.2
+HEIGHT_SCALE = 532_200.0
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional
 # multiplier so the shader math stays consistent. A small positive offset keeps
 # shallow coastlines without burying continents.
-SEA_LEVEL = 0.0  # kilometers above the planet radius
+SEA_LEVEL = 0.0  # meters above the planet radius
 # Slightly brighter water with a touch more scattering makes oceans stand out
 # against land.
 WATER_COLOR = np.array([0.02, 0.16, 0.24], dtype=np.float32)

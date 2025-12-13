@@ -91,7 +91,7 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
 
     planet_changed, editing_params.planet_radius = imgui.input_float(
-        "Planet radius (km)", editing_params.planet_radius, step=10.0, step_fast=50.0
+        "Planet radius (m)", editing_params.planet_radius, step=10000.0, step_fast=50000.0
     )
     if planet_changed:
         editing_params.scale_with_planet_radius()
@@ -106,14 +106,14 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     )
     if atmos_changed or cloud_base_changed or cloud_thickness_changed:
         editing_params.scale_with_planet_radius()
-    imgui.text(f"Atmosphere radius: {editing_params.atmosphere_radius:.2f} km")
-    imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude:.2f} km")
-    imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness:.2f} km")
+    imgui.text(f"Atmosphere radius: {editing_params.atmosphere_radius:.2f} m")
+    imgui.text(f"Cloud base altitude: {editing_params.cloud_base_altitude:.2f} m")
+    imgui.text(f"Cloud thickness: {editing_params.cloud_layer_thickness:.2f} m")
     _, editing_params.height_scale = imgui.input_float(
-        "Height scale (km)", editing_params.height_scale, step=10.0, step_fast=50.0
+        "Height scale (m)", editing_params.height_scale, step=10000.0, step_fast=50000.0
     )
     _, editing_params.sea_level = imgui.input_float(
-        "Sea level offset (km)", editing_params.sea_level, step=1.0, step_fast=5.0
+        "Sea level offset (m)", editing_params.sea_level, step=1000.0, step_fast=5000.0
     )
 
     changed, water_color = imgui.input_float3("Water color", *editing_params.water_color)
@@ -191,7 +191,7 @@ def draw_performance_panel(
 
     imgui.text("Ray distances")
     _, editing_params.max_ray_distance = imgui.input_float(
-        "Max ray distance", editing_params.max_ray_distance, step=50.0, step_fast=200.0
+        "Max ray distance", editing_params.max_ray_distance, step=50000.0, step_fast=200000.0
     )
 
     imgui.separator()
@@ -224,11 +224,11 @@ def draw_performance_panel(
 
     imgui.separator()
     imgui.text("Player")
-    imgui.text(f"Height above terrain: {player_height:.2f} km")
+    imgui.text(f"Height above terrain: {player_height:.2f} m")
     imgui.same_line()
     imgui.text_disabled("(read-only)")
     _, min_ground_clearance = imgui.input_float(
-        "Min ground clearance (km)", min_ground_clearance, step=0.01, step_fast=0.1
+        "Min ground clearance (m)", min_ground_clearance, step=10.0, step_fast=100.0
     )
     gravity_clicked = imgui.button("Gravity (G)", width=140)
     imgui.same_line()
@@ -297,7 +297,7 @@ def main():
     )
     # Start with a modest base speed so surface traversal feels grounded. Speed
     # ramps up automatically as you get farther from the planet.
-    base_speed = 60.0
+    base_speed = 60000.0
     camera.speed = base_speed
     camera.min_radius = None
 
@@ -320,7 +320,7 @@ def main():
     space_pressed = False
     gravity_enabled = False
     g_pressed = False
-    gravity_acceleration = 35.0
+    gravity_acceleration = 35000.0
     min_ground_clearance = 0.0
 
     last_mouse_x, last_mouse_y = width / 2, height / 2

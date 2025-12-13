@@ -81,7 +81,7 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
     float density = (0.32 + 0.55 * (1.0 - altitudeNorm)) * max(pathFactor, 0.12);
 
-    float scatter = scatterSpread * altitudeFalloff * density * sunVisibility * 0.72;
+    float scatter = scatterSpread * altitudeFalloff * density * sunVisibility * 1.12;
     scatter += mieForward * 0.06;
 
     vec3 sunTint = computeSunTint(normalize(rayOrigin), lightDir);

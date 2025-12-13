@@ -3,6 +3,7 @@ import numpy as np
 
 from gl_utils.buffers import create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
+from utils.time import compute_sun_direction
 from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
 
 
@@ -38,6 +39,7 @@ class PlanetRenderer:
         self.planet_to_world = np.identity(3, dtype=np.float32)
         self.world_to_planet = np.identity(3, dtype=np.float32)
         self.time_seconds = 0.0
+        self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
 
     def _ensure_surface_info_buffer(self):
         if self.surface_info_buffer is not None:
@@ -63,18 +65,18 @@ class PlanetRenderer:
             dtype=np.float32,
         )
 
-    def _update_rotation_matrices(self, day_fraction: float, year_fraction: float) -> None:
-        self.spin_angle_deg = (day_fraction * 360.0) % 360.0
-        self.seasonal_tilt_deg = self.parameters.tilt_degrees * np.cos(2.0 * np.pi * year_fraction)
+    def _update_rotation_matrices(self) -> None:
+        self.seasonal_tilt_deg = self.parameters.tilt_degrees
         tilt_rad = np.deg2rad(self.seasonal_tilt_deg)
         tilt_matrix = np.array(
             [[1.0, 0.0, 0.0], [0.0, np.cos(tilt_rad), -np.sin(tilt_rad)], [0.0, np.sin(tilt_rad), np.cos(tilt_rad)]],
             dtype=np.float32,
         )
-        spin_axis = tilt_matrix @ np.array([0.0, 1.0, 0.0], dtype=np.float32)
-        spin_matrix = self._rotation_matrix_from_axis(spin_axis, np.deg2rad(self.spin_angle_deg))
-        self.planet_to_world = spin_matrix @ tilt_matrix
+        self.planet_to_world = tilt_matrix
         self.world_to_planet = self.planet_to_world.T
+
+    def _update_sun_direction(self, day_fraction: float, year_fraction: float) -> None:
+        self.sun_direction = compute_sun_direction(day_fraction, year_fraction, self.parameters.tilt_degrees)
 
     def _ensure_gbuffer(self, width, height):
         if self.gbuffer and self.gbuffer["width"] == width and self.gbuffer["height"] == height:
@@ -100,7 +102,7 @@ class PlanetRenderer:
         set_vec3(program, "camForward", self.cam_forward)
         set_vec3(program, "camRight", self.cam_right)
         set_vec3(program, "camUp", self.cam_up)
-        set_vec3(program, "sunDir", self.parameters.sun_direction)
+        set_vec3(program, "sunDir", self.sun_direction)
         set_float(program, "sunPower", self.parameters.sun_power)
         set_float(program, "planetRadius", self.parameters.planet_radius)
         set_float(program, "atmosphereRadius", self.parameters.atmosphere_radius)
@@ -125,10 +127,12 @@ class PlanetRenderer:
 
     def prepare_frame_state(self, calendar_state):
         self.time_seconds = calendar_state.elapsed_seconds
-        self._update_rotation_matrices(calendar_state.day_fraction, calendar_state.year_fraction)
+        self._update_rotation_matrices()
+        self._update_sun_direction(calendar_state.day_fraction, calendar_state.year_fraction)
 
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
+        self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
 
     def query_surface_info(self, query_pos, min_altitude_offset=0.0):
         if self.surface_info_program is None:
@@ -173,7 +177,8 @@ class PlanetRenderer:
         self.cam_right = cam_right
         self.cam_up = cam_up
         self.time_seconds = calendar_state.elapsed_seconds
-        self._update_rotation_matrices(calendar_state.day_fraction, calendar_state.year_fraction)
+        self._update_rotation_matrices()
+        self._update_sun_direction(calendar_state.day_fraction, calendar_state.year_fraction)
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
 

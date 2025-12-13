@@ -69,7 +69,7 @@ def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
     editing_params.max_ray_distance = editing_params.planet_radius * config["max_ray_distance_factor"]
 
 
-def draw_parameter_panel(editing_params: PlanetParameters):
+def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.ndarray):
     io = imgui.get_io()
     right_panel_width = max(io.display_size.x * 0.28, 360.0)
     imgui.set_next_window_position(
@@ -78,13 +78,8 @@ def draw_parameter_panel(editing_params: PlanetParameters):
     imgui.set_next_window_size(right_panel_width, 0.0, condition=imgui.FIRST_USE_EVER)
     imgui.begin("Planet Parameters")
 
-    changed, sun_dir = imgui.slider_float3("Sun direction", *editing_params.sun_direction, -1.0, 1.0)
-    if changed:
-        new_direction = np.array(sun_dir, dtype=np.float32)
-        length = np.linalg.norm(new_direction)
-        if length > 1e-5:
-            new_direction = new_direction / length
-        editing_params.sun_direction = new_direction
+    imgui.text("Sun direction (simulated)")
+    imgui.text(f"x: {sun_direction[0]:+.3f}  y: {sun_direction[1]:+.3f}  z: {sun_direction[2]:+.3f}")
 
     _, editing_params.sun_power = imgui.slider_float("Sun power", editing_params.sun_power, 0.0, 25.0)
 
@@ -338,6 +333,7 @@ def main():
         dt = timer.get_delta()
         calendar_state = calendar.advance(dt, editing_params.time_speed)
         renderer.prepare_frame_state(calendar_state)
+        current_sun_direction = renderer.sun_direction
         spin_delta = renderer.planet_to_world @ prev_world_to_planet
         glfw.poll_events()
         imgui_renderer.process_inputs()
@@ -484,7 +480,7 @@ def main():
             else:
                 camera.set_reference_up(WORLD_UP)
             camera.update_vectors()
-        update_clicked, reset_clicked = draw_parameter_panel(editing_params)
+        update_clicked, reset_clicked = draw_parameter_panel(editing_params, current_sun_direction)
 
         if update_clicked:
             parameters = editing_params.copy()

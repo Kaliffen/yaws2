@@ -67,16 +67,24 @@ vec3 wrapNoiseCoord(vec3 coord) {
     return coord * 0.5 + 0.5;
 }
 
-float cloudCoverageField(vec3 dir) {
-    float cloudTime = timeSeconds * cloudAnimationSpeed;
+vec3 sampleCoverageNoise(vec3 dir, float cloudTime) {
     float swirlAngle = cloudTime * 0.012;
     vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
     vec3 uvw = clamp(wrapNoiseCoord(rotationY(swirlAngle) * dir + flowOffset), 0.0, 1.0);
+    vec3 detailUvw = clamp(wrapNoiseCoord(rotationY(swirlAngle * 1.5) * dir * 1.7 + flowOffset * 1.4), 0.0, 1.0);
 
-    vec3 noiseSample = texture(coverageNoiseTex, uvw).xyz;
+    vec3 base = texture(coverageNoiseTex, uvw).xyz;
+    vec3 detail = texture(coverageNoiseTex, detailUvw).xyz;
+    return mix(base, base * 0.6 + detail * 0.6, 0.45);
+}
+
+float cloudCoverageField(vec3 dir) {
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    vec3 noiseSample = sampleCoverageNoise(dir, cloudTime);
+
     float coverage = noiseSample.x * 0.65 + noiseSample.y * 0.45 + noiseSample.z * 0.12;
     coverage = coverage * cloudCoverage + 0.12;
-    return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
+    return clamp(smoothstep(0.28, 0.76, coverage), 0.0, 1.0);
 }
 
 float cloudShapeNoise(vec3 p) {
@@ -85,9 +93,13 @@ float cloudShapeNoise(vec3 p) {
     float swirlAngle = cloudTime * 0.02;
     vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
     vec3 uvw = clamp(wrapNoiseCoord(rotationY(swirlAngle) * normalizedP + flowOffset), 0.0, 1.0);
+    vec3 detailUvw = clamp(wrapNoiseCoord(rotationY(swirlAngle * 1.35) * normalizedP * 1.8 + flowOffset * 1.7), 0.0, 1.0);
 
-    vec3 noiseSample = texture(shapeNoiseTex, uvw).xyz;
-    return noiseSample.x * 0.55 + noiseSample.y * 0.3 + noiseSample.z * 0.15;
+    vec3 base = texture(shapeNoiseTex, uvw).xyz;
+    vec3 detail = texture(shapeNoiseTex, detailUvw).xyz;
+    float baseShape = base.x * 0.55 + base.y * 0.3 + base.z * 0.15;
+    float detailShape = detail.x * 0.35 + detail.y * 0.35 + detail.z * 0.3;
+    return mix(baseShape, detailShape, 0.42);
 }
 
 float sampleCloudDensity(vec3 p, float coverageHint) {
@@ -98,8 +110,9 @@ float sampleCloudDensity(vec3 p, float coverageHint) {
     coverage = mix(coverage, coverageHint, 0.25);
 
     float shape = cloudShapeNoise(p);
-    float density = (shape - 0.4) * 1.6;
+    float density = (shape - 0.42) * 1.85;
     density = clamp(density * coverage, 0.0, 1.0);
+    density = density * density * (3.0 - 2.0 * density);
 
     float bottomFade = smoothstep(0.08, 0.22, heightNorm);
     float topFade = 1.0 - smoothstep(0.65, 0.98, heightNorm);

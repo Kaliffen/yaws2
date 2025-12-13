@@ -85,16 +85,24 @@ vec3 wrapNoiseCoord(vec3 coord) {
     return coord * 0.5 + 0.5;
 }
 
-float cloudCoverageField(vec3 dir) {
-    float cloudTime = timeSeconds * cloudAnimationSpeed;
+vec3 sampleCoverageNoise(vec3 dir, float cloudTime) {
     float swirlAngle = cloudTime * 0.012;
     vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
     vec3 uvw = clamp(wrapNoiseCoord(rotationY(swirlAngle) * dir + flowOffset), 0.0, 1.0);
+    vec3 detailUvw = clamp(wrapNoiseCoord(rotationY(swirlAngle * 1.5) * dir * 1.7 + flowOffset * 1.4), 0.0, 1.0);
 
-    vec3 noiseSample = texture(coverageNoiseTex, uvw).xyz;
+    vec3 base = texture(coverageNoiseTex, uvw).xyz;
+    vec3 detail = texture(coverageNoiseTex, detailUvw).xyz;
+    return mix(base, base * 0.6 + detail * 0.6, 0.45);
+}
+
+float cloudCoverageField(vec3 dir) {
+    float cloudTime = timeSeconds * cloudAnimationSpeed;
+    vec3 noiseSample = sampleCoverageNoise(dir, cloudTime);
+
     float coverage = noiseSample.x * 0.65 + noiseSample.y * 0.45 + noiseSample.z * 0.12;
     coverage = coverage * cloudCoverage + 0.12;
-    return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
+    return clamp(smoothstep(0.28, 0.76, coverage), 0.0, 1.0);
 }
 
 // Terrain Height and SDF

@@ -34,7 +34,7 @@ class PlanetRenderer:
         self.surface_info_buffer = None
         self.coverage_noise_tex = None
         self.shape_noise_tex = None
-        self.cloud_noise_size = 64
+        self.cloud_noise_size = 128
         self.cam_pos = None
         self.cam_forward = None
         self.cam_right = None

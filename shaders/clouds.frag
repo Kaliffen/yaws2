@@ -264,10 +264,19 @@ void main() {
     vec3 camPlanet = (worldToPlanet * camPos) * invPlanetRadius;
     vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
+    vec2 atmosphereSegment = viewData.yz * invPlanetRadius;
     float surfaceDistance = viewData.x * invPlanetRadius;
     float distanceLod = computeDistanceLod(surfaceDistance);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
-    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a, distanceLod, jitter);
+    // If the ray doesn't hit the surface, still march through the atmosphere
+    // using the precomputed entry/exit segment so clouds remain visible when
+    // looking away from the planet.
+    float maxDistance = surfaceDistance;
+    if (!hit && atmosphereSegment.y > atmosphereSegment.x) {
+        maxDistance = atmosphereSegment.y;
+    }
+
+    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, maxDistance, material.a, distanceLod, jitter);
 
     FragColor = clouds;
 }

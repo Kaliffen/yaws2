@@ -19,6 +19,8 @@ uniform float atmosphereRadius;
 uniform float aspect;
 uniform mat3 worldToPlanet;
 
+float invPlanetRadius;
+
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
 }
@@ -102,11 +104,29 @@ void main() {
     bool hit = normalFlags.w > -0.5;
     vec3 viewData = decodeViewData(uv);
 
+    invPlanetRadius = planetRadius > 0.0 ? 1.0 / planetRadius : 0.0;
+
     vec3 camPlanet = worldToPlanet * camPos;
     vec3 posPlanet = worldToPlanet * pos;
     vec3 viewDirWorld = normalize(pos - camPos);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
+
     vec2 atmosphereSegment = viewData.yz;
+
+    // If the G-buffer did not report an atmosphere segment (for example, due to
+    // precision loss while normalizing distances), recompute a fallback segment
+    // directly from the camera ray in planet-relative units and then scale it
+    // back to world space so scattering never disappears entirely.
+    if (!(atmosphereSegment.y > atmosphereSegment.x)) {
+        float t0, t1;
+        vec3 camPlanetNorm = camPlanet * invPlanetRadius;
+        vec3 viewDirPlanetNorm = normalize(worldToPlanet * viewDirWorld);
+        float atmosphereRadiusNorm = atmosphereRadius * invPlanetRadius;
+        if (intersectSphere(camPlanetNorm, viewDirPlanetNorm, atmosphereRadiusNorm, t0, t1) && t1 > 0.0) {
+            atmosphereSegment = vec2(max(t0, 0.0), t1) * planetRadius;
+        }
+    }
+
     vec3 atmosphere = (atmosphereSegment.y > atmosphereSegment.x)
         ? computeAtmosphere(camPlanet, viewDirPlanet, posPlanet, hit, atmosphereSegment)
         : vec3(0.0);

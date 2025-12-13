@@ -78,8 +78,8 @@ float cloudCoverageField(vec3 dir) {
 }
 
 // Terrain Height and SDF
-float terrainHeight(vec3 p) {
-    vec3 scaledP = p / planetRadius;
+float terrainHeight(vec3 pNormalized, float heightScaleNormalized) {
+    vec3 scaledP = pNormalized;
 
     float warpFreq = 1.15;
     float warpAmp = 0.06;
@@ -98,13 +98,13 @@ float terrainHeight(vec3 p) {
     float normalized = base * 0.62 + detail * 0.38;
     // Bias the terrain downward so a portion of the surface sits below sea level,
     // revealing oceans instead of an all-land sphere.
-    return (normalized - 0.42) * heightScale;
+    return (normalized - 0.42) * heightScaleNormalized;
 }
 
-float planetSDF(vec3 p) {
+float planetSDF(vec3 p, float heightScaleNormalized) {
     float r = length(p);
-    float h = terrainHeight(p);
-    return r - (planetRadius + h);
+    float h = terrainHeight(p, heightScaleNormalized);
+    return r - (1.0 + h);
 }
 
 vec3 rayDirection(vec2 uv) {
@@ -118,25 +118,35 @@ float interleavedGradientNoise(vec2 pixel) {
 }
 
 float computeLodFactor(vec3 ro, vec3 rd) {
-    float altitude = max(length(ro) - planetRadius, 0.0);
-    float distanceLod = log2(1.0 + altitude / max(planetRadius, 0.0001));
+    float altitude = max(length(ro) - 1.0, 0.0);
+    float distanceLod = log2(1.0 + altitude);
     float horizonAlign = pow(1.0 - abs(dot(normalize(ro), rd)), 2.2);
     return clamp(mix(distanceLod, distanceLod + horizonAlign * 0.5, 0.65), 0.0, 1.0);
 }
 
-bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, float tMin, float tMax, out vec3 pos, out float t) {
+bool marchPlanet(
+    vec3 ro,
+    vec3 rd,
+    float lodFactor,
+    float jitter,
+    float tMin,
+    float tMax,
+    float heightScaleNormalized,
+    out vec3 pos,
+    out float t
+) {
     int stepBudget = int(mix(float(planetMaxSteps), float(planetMaxSteps) * 0.55, lodFactor));
     stepBudget = max(stepBudget, 1);
 
     float adaptiveScale = mix(planetStepScale * 0.65, planetStepScale * 1.85, lodFactor);
     float minStep = mix(planetMinStepFactor * 0.65, planetMinStepFactor * 1.5, lodFactor);
 
-    float eps = max(heightScale * 0.01, planetRadius * 0.0001);
+    float eps = max(heightScaleNormalized * 0.01, 0.0001);
     t = tMin + eps * jitter;
     for (int i = 0; i < 1024; i++) {
         if (i >= stepBudget) break;
         vec3 p = ro + rd * t;
-        float d = planetSDF(p);
+        float d = planetSDF(p, heightScaleNormalized);
         if (d < eps) {
             pos = p;
             return true;
@@ -147,11 +157,11 @@ bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, float tMin, fl
     return false;
 }
 
-vec3 computeNormal(vec3 p, float d0) {
-    float eps = max(planetRadius * 0.0005, heightScale * 0.03);
-    float dx = planetSDF(p + vec3(eps,0,0)) - d0;
-    float dy = planetSDF(p + vec3(0,eps,0)) - d0;
-    float dz = planetSDF(p + vec3(0,0,eps)) - d0;
+vec3 computeNormal(vec3 p, float d0, float heightScaleNormalized) {
+    float eps = max(0.0005, heightScaleNormalized * 0.03);
+    float dx = planetSDF(p + vec3(eps,0,0), heightScaleNormalized) - d0;
+    float dy = planetSDF(p + vec3(0,eps,0), heightScaleNormalized) - d0;
+    float dz = planetSDF(p + vec3(0,0,eps), heightScaleNormalized) - d0;
     return normalize(vec3(dx, dy, dz));
 }
 
@@ -206,40 +216,47 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
 void main() {
     vec2 uv = (gl_FragCoord.xy / resolution) * 2.0 - 1.0;
 
+    float invPlanetRadius = planetRadius > 0.0 ? 1.0 / planetRadius : 0.0;
+    float heightScaleNormalized = heightScale * invPlanetRadius;
+    float seaLevelNormalized = seaLevel * invPlanetRadius;
+    float atmosphereRadiusNormalized = atmosphereRadius * invPlanetRadius;
+    float maxRayDistanceNormalized = maxRayDistance * invPlanetRadius;
+    float distanceScale = planetRadius;
+
     vec3 roWorld = camPos;
     vec3 rdWorld = rayDirection(uv);
-    vec3 ro = worldToPlanet * roWorld;
-    vec3 rd = worldToPlanet * rdWorld;
+    vec3 ro = (worldToPlanet * roWorld) * invPlanetRadius;
+    vec3 rd = normalize(worldToPlanet * rdWorld);
 
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
     float lodFactor = computeLodFactor(ro, rd);
 
     float tAtm0 = 0.0;
     float tAtm1 = 0.0;
-    bool hitsAtmosphere = intersectSphere(ro, rd, atmosphereRadius, tAtm0, tAtm1);
+    bool hitsAtmosphere = intersectSphere(ro, rd, atmosphereRadiusNormalized, tAtm0, tAtm1);
 
     float tPlanet0 = 0.0;
     float tPlanet1 = 0.0;
-    bool hitsPlanetShell = intersectSphere(ro, rd, planetRadius, tPlanet0, tPlanet1);
+    bool hitsPlanetShell = intersectSphere(ro, rd, 1.0, tPlanet0, tPlanet1);
 
-    float waterRadius = planetRadius + seaLevel;
+    float waterRadius = 1.0 + seaLevelNormalized;
     float tWater0 = 0.0;
     float tWater1 = 0.0;
     bool hitWaterSphere = intersectSphere(ro, rd, waterRadius, tWater0, tWater1) && tWater1 > 0.0;
     if (hitWaterSphere && tWater0 < 0.0) tWater0 = 0.0;
 
     float marchStart = 0.0;
-    float marchEnd = maxRayDistance;
+    float marchEnd = maxRayDistanceNormalized;
 
     if (hitsAtmosphere && tAtm1 > 0.0) {
         marchStart = max(tAtm0, 0.0);
-        marchEnd = min(tAtm1, maxRayDistance);
-    } else if (length(ro) > atmosphereRadius && (!hitsAtmosphere || tAtm1 <= 0.0)) {
-        marchStart = maxRayDistance;
-        marchEnd = maxRayDistance;
+        marchEnd = min(tAtm1, maxRayDistanceNormalized);
+    } else if (length(ro) > atmosphereRadiusNormalized && (!hitsAtmosphere || tAtm1 <= 0.0)) {
+        marchStart = maxRayDistanceNormalized;
+        marchEnd = maxRayDistanceNormalized;
     }
 
-    float shellPadding = max(heightScale * 1.2, planetRadius * 0.001);
+    float shellPadding = max(heightScaleNormalized * 1.2, 0.001);
 
     if (hitsPlanetShell && tPlanet1 > 0.0) {
         float entry = max(tPlanet0, 0.0);
@@ -255,18 +272,18 @@ void main() {
     vec3 posPlanet = vec3(0.0);
     float t;
     bool withinSegment = marchEnd > marchStart;
-    bool hit = withinSegment && marchPlanet(ro, rd, lodFactor, jitter, marchStart, marchEnd, posPlanet, t);
+    bool hit = withinSegment && marchPlanet(ro, rd, lodFactor, jitter, marchStart, marchEnd, heightScaleNormalized, posPlanet, t);
 
     float tTerrain = hit ? t : 1e9;
-    float heightValue = hit ? terrainHeight(posPlanet) : -1.0;
+    float heightValue = hit ? terrainHeight(posPlanet, heightScaleNormalized) * distanceScale : -1.0;
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
     float waterFlag = -1.0;
     vec3 normalPlanet = normalize(rd);
 
     if (hit) {
-        float d0 = planetSDF(posPlanet);
-        normalPlanet = computeNormal(posPlanet, d0);
+        float d0 = planetSDF(posPlanet, heightScaleNormalized);
+        normalPlanet = computeNormal(posPlanet, d0, heightScaleNormalized);
         baseColor = landColor(posPlanet, normalPlanet, heightValue);
         waterFlag = 0.0;
     }
@@ -290,28 +307,30 @@ void main() {
     // stray gray cloud patterns.
     bool throughAtmosphere = hit || (hitsAtmosphere && tAtm1 > 0.0);
     if (throughAtmosphere) {
-        vec3 coverageSample = hit ? posPlanet : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
+        vec3 coverageSample = hit ? posPlanet : (ro + rd * min(maxRayDistanceNormalized, max(tAtm1, 0.0)));
         cloudMask = cloudCoverageField(normalize(coverageSample));
     }
 
-    vec3 posWorld = planetToWorld * posPlanet;
+    vec3 posPlanetActual = posPlanet * distanceScale;
+    vec3 posWorld = planetToWorld * posPlanetActual;
     vec3 normal = normalize(planetToWorld * normalPlanet);
 
     float viewDistance = length(posWorld - camPos);
 
     float waterPath = 0.0;
     if (hitWaterSphere) {
-        float waterExit = min(tWater1, viewDistance);
-        if (waterExit > tWater0) {
-            waterPath = waterExit - tWater0;
+        float waterExit = min(tWater1 * distanceScale, viewDistance);
+        float waterEntry = tWater0 * distanceScale;
+        if (waterExit > waterEntry) {
+            waterPath = waterExit - waterEntry;
         }
     }
 
     float atmEntry = 0.0;
     float atmExit = 0.0;
     if (throughAtmosphere) {
-        atmEntry = max(tAtm0, 0.0);
-        atmExit = min(tAtm1, maxRayDistance);
+        atmEntry = max(tAtm0, 0.0) * distanceScale;
+        atmExit = min(tAtm1, maxRayDistanceNormalized) * distanceScale;
     }
 
     gPositionHeight = vec4(posWorld, heightValue);

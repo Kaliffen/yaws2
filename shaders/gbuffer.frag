@@ -265,7 +265,11 @@ void main() {
     bool withinSegment = marchEnd > marchStart;
     bool hit = withinSegment && marchPlanet(ro, rd, lodFactor, jitter, marchStart, marchEnd, posPlanet, t);
 
+    float hitDistance = marchEnd;
     float tTerrain = hit ? t : 1e9;
+    if (hit) {
+        hitDistance = tTerrain;
+    }
     float heightValue = hit ? terrainHeight(posPlanet) : -1.0;
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
@@ -283,6 +287,7 @@ void main() {
     if (waterCoversTerrain) {
         vec3 waterSurfacePos = ro + rd * tWater0;
         posPlanet = waterSurfacePos;
+        hitDistance = tWater0;
         normalPlanet = normalize(waterSurfacePos);
         // Preserve the underlying terrain color so the lighting pass can
         // treat the water as a transparent volume hovering above it.
@@ -305,7 +310,7 @@ void main() {
     vec3 posWorld = planetToWorld * posPlanet;
     vec3 normal = normalize(planetToWorld * normalPlanet);
 
-    float viewDistance = length(posWorld - camPos);
+    float viewDistance = hitDistance;
 
     float waterPath = 0.0;
     if (hitWaterSphere) {

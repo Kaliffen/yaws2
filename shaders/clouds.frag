@@ -20,6 +20,7 @@ uniform float cloudBaseAltitude;
 uniform float cloudLayerThickness;
 uniform float cloudCoverage;
 uniform float cloudDensity;
+uniform float cloudDrawDistance;
 uniform vec3 cloudLightColor;
 uniform float maxRayDistance;
 uniform float aspect;
@@ -34,14 +35,14 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
 
     float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
-    float goldenBand = 1.0 - smoothstep(0.01, 0.50, abs(sunHeight));
+    float goldenBand = 1.0 - smoothstep(0.01, 0.20, abs(sunHeight));
 
     vec3 nightColor = vec3(0.03, 0.06, 0.10);
     vec3 dayColor = vec3(0.46, 0.46, 0.42);
     vec3 goldenColor = vec3(1.04, 0.70, 0.44);
     vec3 twilightColor = vec3(0.44, 0.34, 0.56);
 
-    vec3 warmBlend = mix(dayColor, goldenColor, goldenBand * 2.15);
+    vec3 warmBlend = mix(dayColor, goldenColor, goldenBand * 1.2);
     vec3 base = mix(nightColor, warmBlend, dayFactor);
     return mix(base, twilightColor, goldenBand * 0.18);
 }
@@ -99,28 +100,33 @@ float interleavedGradientNoise(vec2 pixel) {
 
 float cloudCoverageField(vec3 dir) {
     float cloudTime = timeSeconds * cloudAnimationSpeed;
-    float swirlAngle = cloudTime * 0.012;
-    vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
-    vec3 spunDir = rotationY(swirlAngle) * dir;
+    vec3 flowOffset = vec3(cloudTime * 0.00035, 0.0, cloudTime * 0.00055);
+    vec3 lookup = dir * 2.6 + vec3(1.25, -0.45, 0.65) + flowOffset;
 
-    float bands = fbm(spunDir * 3.1 + vec3(1.7, -2.2, 0.5) + flowOffset);
-    float streaks = fbm(spunDir * 7.2 + vec3(-4.1, 2.6, 3.3) - flowOffset);
-    float coverage = bands * 0.65 + streaks * 0.45;
-    coverage = coverage * cloudCoverage + 0.12;
-    return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
+    float base = fbm(lookup);
+    float billow = 1.0 - abs(fbm(lookup * 1.9 + vec3(-2.0, 3.1, 0.5)) * 2.0 - 1.0);
+    float tuft = fbm(lookup * 3.8 + vec3(2.2, 1.4, -3.1));
+    float coverage = mix(base, billow, 0.52);
+    coverage = mix(coverage, tuft, 0.32);
+    float coverageControl = clamp(cloudCoverage / 1.5, 0.0, 1.0);
+    float coverageGain = mix(0.85, 1.85, coverageControl);
+    float coverageBias = mix(-0.1, 0.32, coverageControl);
+    float adjusted = clamp(coverage * coverageGain + coverageBias, 0.0, 1.0);
+    float start = mix(0.42, 0.16, coverageControl);
+    float end = mix(0.82, 0.68, coverageControl);
+    return clamp(smoothstep(start, end, adjusted), 0.0, 1.0);
 }
 
 float cloudShapeNoise(vec3 p) {
     vec3 normalizedP = p / planetRadius;
     float cloudTime = timeSeconds * cloudAnimationSpeed;
-    float swirlAngle = cloudTime * 0.02;
-    vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
-    vec3 warped = rotationY(swirlAngle) * normalizedP + flowOffset;
+    vec3 flowOffset = vec3(cloudTime * 0.0011, cloudTime * 0.0005, -cloudTime * 0.0008);
+    vec3 warped = normalizedP + flowOffset;
 
-    float base = fbm(warped * 22.0 + vec3(8.2, 1.7, -3.4));
-    float detail = fbm(warped * 64.0 - vec3(4.1, 5.6, 2.0));
-    float billow = abs(fbm(warped * 12.0 + vec3(-6.0, 2.5, 4.3)) * 2.0 - 1.0);
-    return base * 0.55 + detail * 0.3 + billow * 0.15;
+    float base = fbm(warped * 18.0 + vec3(6.1, 0.9, -2.4));
+    float billow = abs(fbm(warped * 9.5 + vec3(-3.0, 2.2, 3.8)) * 2.0 - 1.0);
+    float detail = fbm(warped * 42.0 - vec3(2.6, 4.8, 1.4));
+    return base * 0.45 + billow * 0.4 + detail * 0.25;
 }
 
 float sampleCloudDensity(vec3 p, float coverageHint) {
@@ -128,14 +134,14 @@ float sampleCloudDensity(vec3 p, float coverageHint) {
     float heightNorm = clamp((length(p) - layerBaseRadius) / max(cloudLayerThickness, 0.001), 0.0, 1.0);
 
     float coverage = cloudCoverageField(normalize(p));
-    coverage = mix(coverage, coverageHint, 0.25);
+    coverage = mix(coverage, coverageHint, 0.35);
 
     float shape = cloudShapeNoise(p);
-    float density = (shape - 0.4) * 1.6;
+    float density = (shape - 0.48) * 2.1;
     density = clamp(density * coverage, 0.0, 1.0);
 
-    float bottomFade = smoothstep(0.08, 0.22, heightNorm);
-    float topFade = 1.0 - smoothstep(0.65, 0.98, heightNorm);
+    float bottomFade = smoothstep(0.04, 0.24, heightNorm);
+    float topFade = 1.0 - smoothstep(0.6, 0.95, heightNorm);
     return density * bottomFade * topFade;
 }
 
@@ -212,6 +218,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         // accumulate.
         float viewAlignment = abs(dot(-rayDir, normalize(samplePos)));
         float horizonFade = mix(0.25, 1.0, smoothstep(0.05, 0.35, viewAlignment));
+        float horizonLightDimming = mix(0.32, 1.0, smoothstep(0.12, 0.55, viewAlignment));
         density *= horizonFade;
         if (density < 0.001) {
             continue;
@@ -219,19 +226,24 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
         float lightAmount = smoothstep(0.02, 0.18, sunHeight);
         float sunVisibility = smoothstep(-0.28, 0.05, sunHeight);
-        float phase = mix(0.55, 0.85, pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent));
+        float forwardScatter = pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent);
+        float phase = mix(0.38, 0.72, forwardScatter);
         float lowLightAtten = mix(0.4, 1.0, sunVisibility);
-        float diffuseDimming = mix(0.6, 1.0, lightAmount);
+        float diffuseDimming = mix(0.55, 1.0, lightAmount);
+        float twilightMask = smoothstep(-0.25, 0.05, sunHeight) * (1.0 - lightAmount);
+        float twilightDimming = mix(0.6, 1.0, 1.0 - twilightMask * 0.7);
 
         float extinction = density * stepSize * cloudExtinction;
 
         float sunIntensity = max(sunPower, 0.0);
         vec3 sunColor = computeSunTint(localNormal, lightDir) * sunIntensity;
-        vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.35, 0.85, phase) * sunVisibility * lowLightAtten;
-        vec3 ambient = mix(vec3(0.01, 0.015, 0.02), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
-        vec3 warmTwilight = vec3(0.16, 0.11, 0.10) * smoothstep(-0.12, 0.04, sunHeight) * (1.0 - lightAmount) * sunIntensity * 0.35 * lowLightAtten;
+        vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.4, 0.82, phase) * sunVisibility * lowLightAtten;
+        directLight *= mix(0.55, 1.0, lightAmount + sunVisibility * 0.35) * horizonLightDimming;
+        vec3 ambient = mix(vec3(0.02, 0.025, 0.03), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
+        ambient *= mix(0.5, 1.0, lightAmount + sunVisibility * 0.5);
+        vec3 warmTwilight = vec3(0.12, 0.09, 0.10) * twilightMask * sunIntensity * 0.18 * lowLightAtten;
 
-        vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize * diffuseDimming;
+        vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize * diffuseDimming * twilightDimming;
 
         accum += scatter * transmittance;
         transmittance *= exp(-extinction);
@@ -259,7 +271,16 @@ void main() {
     float surfaceDistance = viewData.x;
     float distanceLod = computeDistanceLod(surfaceDistance);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
-    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, surfaceDistance, material.a, distanceLod, jitter);
+    float cappedDistance = min(surfaceDistance, cloudDrawDistance);
+    if (cappedDistance <= 0.0) {
+        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
+    float distanceFade = 1.0 - smoothstep(cloudDrawDistance * 0.7, cloudDrawDistance, surfaceDistance);
+    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, cappedDistance, material.a, distanceLod, jitter);
+    clouds.rgb *= distanceFade;
+    clouds.a = mix(1.0, clouds.a, distanceFade);
 
     FragColor = clouds;
 }

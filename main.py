@@ -331,14 +331,12 @@ def main():
     imgui.create_context()
     imgui_renderer = GlfwRenderer(window)
 
-    prev_planet_to_world = renderer.planet_to_world.copy()
     prev_world_to_planet = renderer.world_to_planet.copy()
 
     while not glfw.window_should_close(window):
         dt = timer.get_delta()
         calendar_state = calendar.advance(dt, editing_params.time_speed)
         renderer.prepare_frame_state(calendar_state)
-        spin_delta = renderer.planet_to_world @ prev_world_to_planet
         glfw.poll_events()
         imgui_renderer.process_inputs()
         imgui.new_frame()
@@ -353,11 +351,17 @@ def main():
         )
 
         if gravity_enabled and in_atmosphere and is_grounded:
-            camera.position = spin_delta @ camera.position
-            camera.velocity = spin_delta @ camera.velocity
-            camera.front = normalize(spin_delta @ camera.front)
-            camera.right = normalize(spin_delta @ camera.right)
-            camera.up = normalize(spin_delta @ camera.up)
+            planet_space_pos = prev_world_to_planet @ camera.position
+            planet_space_vel = prev_world_to_planet @ camera.velocity
+            planet_space_front = prev_world_to_planet @ camera.front
+            planet_space_right = prev_world_to_planet @ camera.right
+            planet_space_up = prev_world_to_planet @ camera.up
+
+            camera.position = renderer.planet_to_world @ planet_space_pos
+            camera.velocity = renderer.planet_to_world @ planet_space_vel
+            camera.front = normalize(renderer.planet_to_world @ planet_space_front)
+            camera.right = normalize(renderer.planet_to_world @ planet_space_right)
+            camera.up = normalize(renderer.planet_to_world @ planet_space_up)
             camera.yaw = np.degrees(np.arctan2(camera.front[2], camera.front[0]))
             camera.pitch = np.degrees(np.arcsin(np.clip(camera.front[1], -1.0, 1.0)))
             surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
@@ -526,7 +530,6 @@ def main():
 
         glfw.swap_buffers(window)
 
-        prev_planet_to_world = renderer.planet_to_world.copy()
         prev_world_to_planet = renderer.world_to_planet.copy()
 
     glfw.terminate()

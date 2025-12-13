@@ -216,6 +216,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         // accumulate.
         float viewAlignment = abs(dot(-rayDir, normalize(samplePos)));
         float horizonFade = mix(0.25, 1.0, smoothstep(0.05, 0.35, viewAlignment));
+        float horizonLightDimming = mix(0.32, 1.0, smoothstep(0.12, 0.55, viewAlignment));
         density *= horizonFade;
         if (density < 0.001) {
             continue;
@@ -224,7 +225,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         float lightAmount = smoothstep(0.02, 0.18, sunHeight);
         float sunVisibility = smoothstep(-0.28, 0.05, sunHeight);
         float forwardScatter = pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent);
-        float phase = mix(0.42, 0.78, forwardScatter);
+        float phase = mix(0.38, 0.72, forwardScatter);
         float lowLightAtten = mix(0.4, 1.0, sunVisibility);
         float diffuseDimming = mix(0.55, 1.0, lightAmount);
         float twilightMask = smoothstep(-0.25, 0.05, sunHeight) * (1.0 - lightAmount);
@@ -235,7 +236,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         float sunIntensity = max(sunPower, 0.0);
         vec3 sunColor = computeSunTint(localNormal, lightDir) * sunIntensity;
         vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.4, 0.82, phase) * sunVisibility * lowLightAtten;
-        directLight *= mix(0.55, 1.0, lightAmount + sunVisibility * 0.35);
+        directLight *= mix(0.55, 1.0, lightAmount + sunVisibility * 0.35) * horizonLightDimming;
         vec3 ambient = mix(vec3(0.02, 0.025, 0.03), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
         ambient *= mix(0.5, 1.0, lightAmount + sunVisibility * 0.5);
         vec3 warmTwilight = vec3(0.12, 0.09, 0.10) * twilightMask * sunIntensity * 0.18 * lowLightAtten;

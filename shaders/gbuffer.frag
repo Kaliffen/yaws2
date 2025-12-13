@@ -89,7 +89,7 @@ float cloudCoverageField(vec3 dir) {
     float cloudTime = timeSeconds * cloudAnimationSpeed;
     float swirlAngle = cloudTime * 0.012;
     vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
-    vec3 uvw = wrapNoiseCoord(rotationY(swirlAngle) * dir + flowOffset);
+    vec3 uvw = clamp(wrapNoiseCoord(rotationY(swirlAngle) * dir + flowOffset), 0.0, 1.0);
 
     vec3 noiseSample = texture(coverageNoiseTex, uvw).xyz;
     float coverage = noiseSample.x * 0.65 + noiseSample.y * 0.45 + noiseSample.z * 0.12;

@@ -50,7 +50,7 @@ def create_3d_texture(
     type=GL_FLOAT,
     min_filter=GL_LINEAR,
     mag_filter=GL_LINEAR,
-    wrap=GL_REPEAT,
+    wrap=GL_CLAMP_TO_EDGE,
 ):
     tex = glGenTextures(1)
     glBindTexture(GL_TEXTURE_3D, tex)

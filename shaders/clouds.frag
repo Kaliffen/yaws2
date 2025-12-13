@@ -99,28 +99,26 @@ float interleavedGradientNoise(vec2 pixel) {
 
 float cloudCoverageField(vec3 dir) {
     float cloudTime = timeSeconds * cloudAnimationSpeed;
-    float swirlAngle = cloudTime * 0.012;
-    vec3 flowOffset = vec3(cloudTime * 0.0007, 0.0, -cloudTime * 0.0009);
-    vec3 spunDir = rotationY(swirlAngle) * dir;
+    vec3 flowOffset = vec3(cloudTime * 0.00035, 0.0, cloudTime * 0.00055);
+    vec3 lookup = dir * 2.6 + vec3(1.25, -0.45, 0.65) + flowOffset;
 
-    float bands = fbm(spunDir * 3.1 + vec3(1.7, -2.2, 0.5) + flowOffset);
-    float streaks = fbm(spunDir * 7.2 + vec3(-4.1, 2.6, 3.3) - flowOffset);
-    float coverage = bands * 0.65 + streaks * 0.45;
-    coverage = coverage * cloudCoverage + 0.12;
-    return clamp(smoothstep(0.32, 0.78, coverage), 0.0, 1.0);
+    float base = fbm(lookup);
+    float billow = 1.0 - abs(fbm(lookup * 1.9 + vec3(-2.0, 3.1, 0.5)) * 2.0 - 1.0);
+    float coverage = mix(base, billow, 0.55);
+    coverage = coverage * cloudCoverage + 0.2;
+    return clamp(smoothstep(0.35, 0.75, coverage), 0.0, 1.0);
 }
 
 float cloudShapeNoise(vec3 p) {
     vec3 normalizedP = p / planetRadius;
     float cloudTime = timeSeconds * cloudAnimationSpeed;
-    float swirlAngle = cloudTime * 0.02;
-    vec3 flowOffset = vec3(cloudTime * 0.0015, cloudTime * 0.0006, -cloudTime * 0.001);
-    vec3 warped = rotationY(swirlAngle) * normalizedP + flowOffset;
+    vec3 flowOffset = vec3(cloudTime * 0.0011, cloudTime * 0.0005, -cloudTime * 0.0008);
+    vec3 warped = normalizedP + flowOffset;
 
-    float base = fbm(warped * 22.0 + vec3(8.2, 1.7, -3.4));
-    float detail = fbm(warped * 64.0 - vec3(4.1, 5.6, 2.0));
-    float billow = abs(fbm(warped * 12.0 + vec3(-6.0, 2.5, 4.3)) * 2.0 - 1.0);
-    return base * 0.55 + detail * 0.3 + billow * 0.15;
+    float base = fbm(warped * 18.0 + vec3(6.1, 0.9, -2.4));
+    float billow = abs(fbm(warped * 9.5 + vec3(-3.0, 2.2, 3.8)) * 2.0 - 1.0);
+    float detail = fbm(warped * 42.0 - vec3(2.6, 4.8, 1.4));
+    return base * 0.45 + billow * 0.4 + detail * 0.25;
 }
 
 float sampleCloudDensity(vec3 p, float coverageHint) {
@@ -131,11 +129,11 @@ float sampleCloudDensity(vec3 p, float coverageHint) {
     coverage = mix(coverage, coverageHint, 0.25);
 
     float shape = cloudShapeNoise(p);
-    float density = (shape - 0.4) * 1.6;
+    float density = (shape - 0.5) * 1.8;
     density = clamp(density * coverage, 0.0, 1.0);
 
-    float bottomFade = smoothstep(0.08, 0.22, heightNorm);
-    float topFade = 1.0 - smoothstep(0.65, 0.98, heightNorm);
+    float bottomFade = smoothstep(0.04, 0.24, heightNorm);
+    float topFade = 1.0 - smoothstep(0.6, 0.95, heightNorm);
     return density * bottomFade * topFade;
 }
 
@@ -219,17 +217,18 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
         float lightAmount = smoothstep(0.02, 0.18, sunHeight);
         float sunVisibility = smoothstep(-0.28, 0.05, sunHeight);
-        float phase = mix(0.55, 0.85, pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent));
+        float forwardScatter = pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent);
+        float phase = mix(0.42, 0.78, forwardScatter);
         float lowLightAtten = mix(0.4, 1.0, sunVisibility);
-        float diffuseDimming = mix(0.6, 1.0, lightAmount);
+        float diffuseDimming = mix(0.65, 1.0, lightAmount);
 
         float extinction = density * stepSize * cloudExtinction;
 
         float sunIntensity = max(sunPower, 0.0);
         vec3 sunColor = computeSunTint(localNormal, lightDir) * sunIntensity;
-        vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.35, 0.85, phase) * sunVisibility * lowLightAtten;
-        vec3 ambient = mix(vec3(0.01, 0.015, 0.02), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
-        vec3 warmTwilight = vec3(0.16, 0.11, 0.10) * smoothstep(-0.12, 0.04, sunHeight) * (1.0 - lightAmount) * sunIntensity * 0.35 * lowLightAtten;
+        vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.4, 0.82, phase) * sunVisibility * lowLightAtten;
+        vec3 ambient = mix(vec3(0.02, 0.025, 0.03), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
+        vec3 warmTwilight = vec3(0.14, 0.10, 0.10) * smoothstep(-0.12, 0.04, sunHeight) * (1.0 - lightAmount) * sunIntensity * 0.3 * lowLightAtten;
 
         vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize * diffuseDimming;
 

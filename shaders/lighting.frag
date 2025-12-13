@@ -54,6 +54,23 @@ vec3 computeSunTint(vec3 position, vec3 lightDir) {
     return mix(base, twilightColor, goldenBand * 0.15);
 }
 
+float computeAmbientOcclusion(vec3 pos, vec3 normal, float heightValue) {
+    // Simple geometric AO based on curvature relative to the planet center and
+    // local slope. This darkens creases without a full AO pass.
+    float upAlign = clamp(dot(normalize(pos), normal), 0.0, 1.0);
+    float curvature = pow(upAlign, 1.3);
+    float slope = 1.0 - upAlign;
+
+    float shorelineCavity = smoothstep(seaLevel - 60.0, seaLevel + 25.0, heightValue);
+    float altitudeRelax = smoothstep(seaLevel + 40.0, seaLevel + 320.0, heightValue);
+
+    float ao = mix(0.55, 0.85, curvature);
+    ao *= mix(0.82, 1.0, altitudeRelax);
+    ao = mix(ao * 0.85, ao, shorelineCavity);
+    ao = mix(ao, ao * 0.9, slope);
+    return clamp(ao, 0.35, 1.0);
+}
+
 float computeShadow(vec3 pos, vec3 normal) {
     vec3 lightDir = normalize(sunDir);
     float ndl = dot(normal, lightDir);
@@ -137,8 +154,12 @@ void main() {
 
     softHalo *= sunVisibility;
 
-    vec3 directLight = effectiveSunColor * (wrapNdl * horizonBlend + softHalo * 0.5);
-    vec3 ambient = ambientLight * (ambientStrength + softHalo * 0.25);
+    vec3 directLight = effectiveSunColor * (wrapNdl * 0.55 * horizonBlend + softHalo * 0.35);
+    vec3 ambient = ambientLight * (ambientStrength + softHalo * 0.2);
+
+    float ambientOcclusion = hit ? computeAmbientOcclusion(pos, normal, heightValue) : 1.0;
+    directLight *= mix(0.75, 1.0, ambientOcclusion);
+    ambient *= ambientOcclusion;
 
     float shadow = hit ? computeShadow(pos, normal) : 0.0;
 
@@ -154,8 +175,8 @@ void main() {
     if (waterFlag > 0.5) {
         color = waterShaded;
     } else {
-        float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 24.0) * shadow;
-        color += spec * effectiveSunColor * 0.08;
+        float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 18.0) * shadow;
+        color += spec * effectiveSunColor * 0.045;
 
         if (waterPath > 0.0) {
             float waterAtten = exp(-waterAbsorption * waterPath * 0.65);

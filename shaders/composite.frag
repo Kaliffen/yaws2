@@ -48,6 +48,16 @@ float decodeViewDistance(vec2 uv) {
     return texture(gViewData, uv).x;
 }
 
+vec3 acesToneMap(vec3 x) {
+    // Fitted ACES approximation for subtle highlight rolloff.
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 void main() {
     vec2 uv = TexCoord;
 
@@ -115,6 +125,10 @@ void main() {
 
     if (level >= 9) {
         composite += clouds;
+    }
+
+    if (level >= 5) {
+        composite = acesToneMap(max(composite, vec3(0.0)));
     }
 
     FragColor = vec4(composite, 1.0);

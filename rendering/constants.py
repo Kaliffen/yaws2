@@ -4,7 +4,7 @@ import numpy as np
 
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
-SUN_POWER = 1.5
+SUN_POWER = 2.2
 SCALAR = 1.0
 # Base scale values for the planet and atmosphere (kilometers)
 # Use a realistic Earth-sized radius so the horizon and curvature feel correct
@@ -27,18 +27,17 @@ ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
 # Keep terrain displacement realistic relative to the planet scale to avoid
 # exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 432.2 * SCALAR
+HEIGHT_SCALE = 468.0 * SCALAR
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional
 # multiplier so the shader math stays consistent. A small positive offset keeps
 # shallow coastlines without burying continents.
 SEA_LEVEL = 0.0  # kilometers above the planet radius
-# Slightly brighter water with a touch more scattering makes oceans stand out
-# against land.
-WATER_COLOR = np.array([0.02, 0.16, 0.24], dtype=np.float32)
-WATER_ABSORPTION = 0.74
-WATER_SCATTERING = 0.24
+# Slightly cooler, deeper water for consistent shading against the land palette.
+WATER_COLOR = np.array([0.018, 0.13, 0.22], dtype=np.float32)
+WATER_ABSORPTION = 0.62
+WATER_SCATTERING = 0.36
 
 # Raymarch distances scale with the planet to ensure intersections are found
 # reliably without overshooting. A longer distance avoids missing the planet
@@ -55,14 +54,14 @@ _BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS
 
 CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
 CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
-CLOUD_COVERAGE = 0.44
-CLOUD_DENSITY = 0.45
-CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
+CLOUD_COVERAGE = 0.48
+CLOUD_DENSITY = 0.48
+CLOUD_LIGHT_COLOR = np.array([1.0, 0.985, 0.97], dtype=np.float32)
 
 # Raymarch controls
 PLANET_MAX_STEPS = 320
-PLANET_STEP_SCALE = 0.17
-PLANET_MIN_STEP_FACTOR = 0.5
+PLANET_STEP_SCALE = 0.16
+PLANET_MIN_STEP_FACTOR = 0.45
 
 CLOUD_MAX_STEPS = 48
 CLOUD_EXTINCTION = 0.55
@@ -70,8 +69,8 @@ CLOUD_PHASE_EXPONENT = 2.5
 CLOUD_ANIMATION_SPEED = 0.006
 
 # Post process parameters
-EXPOSURE = 1.1
-GAMMA = 2.2
+EXPOSURE = 1.05
+GAMMA = 2.05
 
 # Planet orientation
 TILT_DEGREES = 23.5

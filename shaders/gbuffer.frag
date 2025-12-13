@@ -184,34 +184,34 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
 }
 
 vec3 landColor(vec3 p, vec3 normal, float h) {
-    vec3 ocean = vec3(0.026, 0.16, 0.32);
-    vec3 coast = vec3(0.82, 0.75, 0.6);
-    vec3 landLow = vec3(0.18, 0.42, 0.2);
-    vec3 landHigh = vec3(0.36, 0.34, 0.22);
-    vec3 landRock = vec3(0.38, 0.36, 0.33);
-    vec3 mountain = vec3(0.55, 0.56, 0.6);
-    vec3 snow = vec3(0.92, 0.95, 0.98);
+    vec3 ocean = waterColor;
+    vec3 coast = vec3(0.72, 0.67, 0.58);
+    vec3 landLow = vec3(0.19, 0.37, 0.24);
+    vec3 landHigh = vec3(0.32, 0.38, 0.26);
+    vec3 landRock = vec3(0.37, 0.36, 0.33);
+    vec3 mountain = vec3(0.54, 0.58, 0.62);
+    vec3 snow = vec3(0.93, 0.96, 0.99);
 
     float seaLevelHeight = seaLevel;
     float heightAboveSea = h - seaLevelHeight;
     float normalizedHeight = heightAboveSea / max(heightScale, 0.0001);
-    normalizedHeight = normalizedHeight * 5;
+    normalizedHeight = normalizedHeight * 3.8;
 
-    // Keep the coastline as a relatively thin band so inland regions pick up the
-    // intended greens and browns instead of the sandy coastline tint.
-    float coastBlend = smoothstep(-0.06, 0.01, normalizedHeight);
-    float landBlend = smoothstep(0.02, 0.32, normalizedHeight);
-    float mountainBlend = smoothstep(0.35, 0.62, normalizedHeight);
-    float snowBlend = smoothstep(0.65, 0.9, normalizedHeight);
+    // Keep the coastline as a thin, cool band and avoid yellow outlines by
+    // narrowing the blend region and desaturating the sand tone.
+    float coastBlend = smoothstep(-0.05, 0.02, normalizedHeight);
+    float landBlend = smoothstep(0.02, 0.30, normalizedHeight);
+    float mountainBlend = smoothstep(0.28, 0.60, normalizedHeight);
+    float snowBlend = smoothstep(0.55, 0.85, normalizedHeight);
 
     float heightNorm = clamp(normalizedHeight, 0.0, 1.0);
     float slope = 1.0 - clamp(dot(normalize(p), normal), 0.0, 1.0);
-    float slopeRock = smoothstep(0.28, 0.7, slope);
+    float slopeRock = smoothstep(0.26, 0.66, slope);
     float colorNoise = fbm(normalize(p) * 12.0 + vec3(3.7, 1.3, 6.2));
-    float heightMix = clamp(heightNorm * 1.2 + colorNoise * 0.25, 0.0, 1.0);
+    float heightMix = clamp(heightNorm * 1.1 + colorNoise * 0.22, 0.0, 1.0);
 
     vec3 variedLand = mix(landLow, landHigh, heightMix);
-    variedLand = mix(variedLand, landRock, slopeRock * 0.65);
+    variedLand = mix(variedLand, landRock, slopeRock * 0.6);
 
     vec3 color = mix(ocean, coast, coastBlend);
     color = mix(color, variedLand, landBlend);

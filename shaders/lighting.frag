@@ -42,16 +42,16 @@ vec3 computeSunTint(vec3 position, vec3 lightDir) {
     float sunHeight = clamp(dot(normalize(position), lightDir), -1.0, 1.0);
 
     float dayFactor = smoothstep(-0.02, 0.08, sunHeight);
-    float goldenBand = 1.0 - smoothstep(0.01, 0.17, abs(sunHeight));
+    float goldenBand = 1.0 - smoothstep(0.01, 0.16, abs(sunHeight));
 
     vec3 nightColor = vec3(0.04, 0.07, 0.12);
-    vec3 dayColor = vec3(0.94, 0.95, 0.93);
-    vec3 goldenColor = vec3(1.04, 0.72, 0.46);
-    vec3 twilightColor = vec3(0.48, 0.36, 0.60);
+    vec3 dayColor = vec3(0.96, 0.98, 1.00);
+    vec3 goldenColor = vec3(1.02, 0.86, 0.62);
+    vec3 twilightColor = vec3(0.54, 0.44, 0.70);
 
-    vec3 warmBlend = mix(dayColor, goldenColor, goldenBand * 1.35);
+    vec3 warmBlend = mix(dayColor, goldenColor, goldenBand * 0.9);
     vec3 base = mix(nightColor, warmBlend, dayFactor);
-    return mix(base, twilightColor, goldenBand * 0.15);
+    return mix(base, twilightColor, goldenBand * 0.16);
 }
 
 float computeShadow(vec3 pos, vec3 normal) {
@@ -91,7 +91,7 @@ vec3 shadeWater(
 
     float bedDarken = smoothstep(0.0, 80.0, depth);
     vec3 transmitted = floorColor * absorption * mix(1.0, 0.25, bedDarken);
-    vec3 reflected = mix(waterColor, sunColor, 0.25) * (0.35 + 0.65 * ndl * shadow);
+    vec3 reflected = mix(waterColor, sunColor, 0.18) * (0.35 + 0.65 * ndl * shadow);
 
     float fresnel = 0.02 + pow(1.0 - viewFacing, 5.0);
 
@@ -99,7 +99,7 @@ vec3 shadeWater(
     vec3 color = mix(transmitted + inScattering, reflected + ambientReflection, fresnel);
 
     float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 48.0) * shadow;
-    color += spec * mix(0.08, 0.35, scatterAmount) * sunColor;
+    color += spec * mix(0.08, 0.3, scatterAmount) * sunColor;
 
     return color;
 }
@@ -155,7 +155,7 @@ void main() {
         color = waterShaded;
     } else {
         float spec = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 24.0) * shadow;
-        color += spec * effectiveSunColor * 0.08;
+        color += spec * effectiveSunColor * 0.06;
 
         if (waterPath > 0.0) {
             float waterAtten = exp(-waterAbsorption * waterPath * 0.65);

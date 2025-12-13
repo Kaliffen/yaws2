@@ -33,7 +33,7 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
 
     float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
-    float goldenBand = smoothstep(0.0, 0.02, 1.0 - abs(sunHeight)) * smoothstep(-0.02, 0.05, sunHeight);
+    float goldenBand = 1.0 - smoothstep(0.01, 0.05, abs(sunHeight));
 
     vec3 nightColor = vec3(0.03, 0.06, 0.10);
     vec3 dayColor = vec3(0.96, 0.96, 0.92);

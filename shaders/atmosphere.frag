@@ -62,7 +62,7 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
 
     // Transition from a cool night hue to a tighter, warmer daylight band.
     float dayFactor = smoothstep(-0.08, 0.12, sunHeight);
-    float goldenBand = smoothstep(0.0, 0.02, 1.0 - abs(sunHeight)) * smoothstep(-0.02, 0.05, sunHeight);
+    float goldenBand = 1.0 - smoothstep(0.01, 0.05, abs(sunHeight));
 
     vec3 nightColor = vec3(0.02, 0.06, 0.12);
     vec3 dayColor = vec3(0.26, 0.48, 0.70);

@@ -55,9 +55,8 @@ _BASELINE_CLOUD_LAYER_THICKNESS = PLANET_RADIUS * _BASELINE_ATMOSPHERE_THICKNESS
 
 CLOUD_BASE_ALTITUDE = _BASELINE_CLOUD_BASE_ALTITUDE
 CLOUD_LAYER_THICKNESS = _BASELINE_CLOUD_LAYER_THICKNESS
-CLOUD_COVERAGE = 0.58
-CLOUD_WORLD_COVERAGE = 1.15
-CLOUD_DENSITY = 0.45
+CLOUD_COVERAGE = 1.05
+CLOUD_DENSITY = 0.62
 CLOUD_DRAW_DISTANCE_FACTOR = 1.4
 CLOUD_LIGHT_COLOR = np.array([1.0, 0.97, 0.94], dtype=np.float32)
 
@@ -100,7 +99,6 @@ class PlanetParameters:
     cloud_base_altitude: float = CLOUD_BASE_ALTITUDE
     cloud_layer_thickness: float = CLOUD_LAYER_THICKNESS
     cloud_coverage: float = CLOUD_COVERAGE
-    cloud_world_coverage: float = CLOUD_WORLD_COVERAGE
     cloud_density: float = CLOUD_DENSITY
     cloud_draw_distance_factor: float = CLOUD_DRAW_DISTANCE_FACTOR
     cloud_draw_distance: float = PLANET_RADIUS * CLOUD_DRAW_DISTANCE_FACTOR
@@ -150,7 +148,6 @@ class PlanetParameters:
             cloud_base_altitude=self.cloud_base_altitude,
             cloud_layer_thickness=self.cloud_layer_thickness,
             cloud_coverage=self.cloud_coverage,
-            cloud_world_coverage=self.cloud_world_coverage,
             cloud_density=self.cloud_density,
             cloud_draw_distance_factor=self.cloud_draw_distance_factor,
             cloud_draw_distance=self.cloud_draw_distance,

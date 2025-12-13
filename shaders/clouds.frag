@@ -20,7 +20,6 @@ uniform float cloudBaseAltitude;
 uniform float cloudLayerThickness;
 uniform float cloudCoverage;
 uniform float cloudDensity;
-uniform float cloudWorldCoverage;
 uniform float cloudDrawDistance;
 uniform vec3 cloudLightColor;
 uniform float maxRayDistance;
@@ -109,10 +108,13 @@ float cloudCoverageField(vec3 dir) {
     float tuft = fbm(lookup * 3.8 + vec3(2.2, 1.4, -3.1));
     float coverage = mix(base, billow, 0.52);
     coverage = mix(coverage, tuft, 0.32);
-    coverage = coverage * (cloudCoverage + 0.55) + 0.25;
-    coverage *= (0.85 + cloudWorldCoverage * 0.65);
-    coverage = clamp(coverage, 0.0, 1.0);
-    return clamp(smoothstep(0.2, 0.75, coverage), 0.0, 1.0);
+    float coverageControl = clamp(cloudCoverage / 1.5, 0.0, 1.0);
+    float coverageGain = mix(0.85, 1.85, coverageControl);
+    float coverageBias = mix(-0.1, 0.32, coverageControl);
+    float adjusted = clamp(coverage * coverageGain + coverageBias, 0.0, 1.0);
+    float start = mix(0.42, 0.16, coverageControl);
+    float end = mix(0.82, 0.68, coverageControl);
+    return clamp(smoothstep(start, end, adjusted), 0.0, 1.0);
 }
 
 float cloudShapeNoise(vec3 p) {

@@ -32,7 +32,6 @@ uniform float timeSeconds;
 // Water Parameters
 uniform vec3 waterColor;
 uniform float cloudCoverage;
-uniform float cloudWorldCoverage;
 
 // Helpers
 float hash(vec3 p) {
@@ -76,10 +75,13 @@ float cloudCoverageField(vec3 dir) {
     float streaks = fbm(dir * 7.2 + vec3(-4.1, 2.6, 3.3));
     float puffs = fbm(dir * 12.5 + vec3(5.1, -1.9, 3.6));
     float coverage = bands * 0.55 + streaks * 0.35 + puffs * 0.25;
-    coverage = coverage * (cloudCoverage + 0.55) + 0.25;
-    coverage *= (0.85 + cloudWorldCoverage * 0.65);
-    coverage = clamp(coverage, 0.0, 1.0);
-    return clamp(smoothstep(0.22, 0.72, coverage), 0.0, 1.0);
+    float coverageControl = clamp(cloudCoverage / 1.5, 0.0, 1.0);
+    float coverageGain = mix(0.85, 1.85, coverageControl);
+    float coverageBias = mix(-0.1, 0.32, coverageControl);
+    float adjusted = clamp(coverage * coverageGain + coverageBias, 0.0, 1.0);
+    float start = mix(0.44, 0.18, coverageControl);
+    float end = mix(0.82, 0.68, coverageControl);
+    return clamp(smoothstep(start, end, adjusted), 0.0, 1.0);
 }
 
 // Terrain Height and SDF

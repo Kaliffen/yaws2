@@ -14,6 +14,8 @@ uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
 uniform float sunPower;
+uniform vec3 moonDir;
+uniform float moonPower;
 uniform float planetRadius;
 uniform float atmosphereRadius;
 uniform float aspect;
@@ -58,6 +60,9 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     vec3 lightDir = normalize(worldToPlanet * sunDir);
     float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
     float sunVisibility = smoothstep(-0.08, 0.12, sunFacing);
+    vec3 moonDirLocal = normalize(worldToPlanet * moonDir);
+    float moonFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), moonDirLocal);
+    float moonVisibility = smoothstep(-0.18, 0.04, moonFacing);
 
     float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
 
@@ -91,7 +96,15 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     vec3 highAltTint = mix(vec3(0.08, 0.12, 0.18), vec3(0.18, 0.26, 0.36), horizonFactor);
     vec3 atmosphereColor = mix(highAltTint, horizonTint, clamp(0.28 + horizonFactor, 0.0, 1.0));
     float sunIntensity = max(sunPower, 0.0);
-    return atmosphereColor * scatter * sunIntensity;
+    vec3 sunScatter = atmosphereColor * scatter * sunIntensity;
+
+    float moonIntensity = max(moonPower, 0.0);
+    float moonForward = pow(max(dot(rayDir, moonDirLocal), 0.0), 3.0) * moonVisibility;
+    float moonScatter = scatterSpread * altitudeFalloff * density * moonVisibility * 0.35;
+    moonScatter += moonForward * 0.04;
+    vec3 moonTint = vec3(0.46, 0.52, 0.64) * moonIntensity;
+
+    return sunScatter + moonTint * moonScatter;
 }
 
 void main() {

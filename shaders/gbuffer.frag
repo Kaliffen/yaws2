@@ -12,6 +12,8 @@ uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
 uniform float sunPower;
+uniform vec3 moonDir;
+uniform float moonPower;
 uniform float aspect;
 uniform float tanHalfFov;
 

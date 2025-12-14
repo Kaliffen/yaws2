@@ -108,7 +108,7 @@ vec3 renderSun(vec2 uv) {
     if (!projectDirection(sunDir, screenUV)) return vec3(0.0);
     if (planetOccludes(sunDir)) return vec3(0.0);
 
-    float radius = angularRadiusToScreen(radians(1.35));
+    float radius = angularRadiusToScreen(radians(2.45));
     vec2 toCenter = uv - screenUV;
     float dist = length(toCenter);
     if (dist >= radius) return vec3(0.0);
@@ -117,9 +117,9 @@ vec3 renderSun(vec2 uv) {
     float facing = max(dot(normal, normalize(sunDir)), 0.0);
     float rim = smoothstep(1.0, 0.0, dist / max(radius, 1e-5));
 
-    vec3 base = vec3(1.55, 1.22, 0.78);
+    vec3 base = vec3(1.65, 1.28, 0.82);
     float glow = pow(rim, 1.5) + pow(facing, 6.0);
-    return base * sunPower * (1.1 * rim + 1.4 * glow);
+    return base * sunPower * (1.25 * rim + 1.6 * glow);
 }
 
 vec3 renderMoon(vec2 uv) {
@@ -127,7 +127,7 @@ vec3 renderMoon(vec2 uv) {
     if (!projectDirection(moonDir, screenUV)) return vec3(0.0);
     if (planetOccludes(moonDir)) return vec3(0.0);
 
-    float radius = angularRadiusToScreen(radians(0.52));
+    float radius = angularRadiusToScreen(radians(1.1));
     vec2 toCenter = uv - screenUV;
     float dist = length(toCenter);
     if (dist >= radius) return vec3(0.0);
@@ -139,8 +139,9 @@ vec3 renderMoon(vec2 uv) {
     float phase = clamp(0.35 + 0.65 * dot(normalize(-sunDir), normalize(moonDir)), 0.0, 1.0);
 
     vec3 albedo = vec3(0.74, 0.78, 0.84);
-    float brightness = (0.12 + lambert * 0.9) * rim * softness * phase;
-    return albedo * moonPower * brightness;
+    float brightness = (0.16 + lambert * 0.95) * rim * softness * phase;
+    float visibilityBoost = 0.08 * rim;
+    return albedo * moonPower * (brightness + visibilityBoost);
 }
 
 void main() {

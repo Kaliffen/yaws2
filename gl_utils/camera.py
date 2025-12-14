@@ -89,9 +89,18 @@ class FPSCamera:
         self.update_vectors()
 
     def update_vectors(self):
-        self.front = normalize(_apply_quaternion(self.orientation, np.array([0.0, 0.0, -1.0], dtype=np.float32)))
-        self.right = normalize(_apply_quaternion(self.orientation, np.array([1.0, 0.0, 0.0], dtype=np.float32)))
-        self.up = normalize(np.cross(self.right, self.front))
+        # Apply the quaternion directly to each canonical basis axis so roll and
+        # near-vertical pitch preserve a consistent view-up direction. Deriving
+        # one axis from another via cross products can flip when the forward
+        # vector approaches the reference up direction, which made yaw behave
+        # like roll at extreme pitches.
+        self.front = normalize(
+            _apply_quaternion(self.orientation, np.array([0.0, 0.0, -1.0], dtype=np.float32))
+        )
+        self.up = normalize(
+            _apply_quaternion(self.orientation, np.array([0.0, 1.0, 0.0], dtype=np.float32))
+        )
+        self.right = normalize(np.cross(self.front, self.up))
 
     def process_mouse(self, xoff, yoff):
         roll_rad = np.radians(-self.roll)

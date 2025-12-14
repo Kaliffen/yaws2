@@ -44,7 +44,7 @@ bool planetOccludes(vec3 camPlanet, vec3 dir) {
     float sqrtH = sqrt(h);
     float tNear = -b - sqrtH;
     float tFar = -b + sqrtH;
-    return tFar > 0.0 && (tNear > 0.0 || length(camPlanet) > planetRadius);
+    return tFar > 0.0 && (tNear > 0.0 || length(camPlanet) <= planetRadius);
 }
 
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {

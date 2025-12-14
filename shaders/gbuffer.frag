@@ -4,6 +4,7 @@ layout (location = 0) out vec4 gPositionHeight;   // xyz = world position of fir
 layout (location = 1) out vec4 gNormalFlags;      // xyz = normal, w = water coverage (1 water, 0 land, -1 no hit)
 layout (location = 2) out vec4 gMaterial;         // rgb = albedo, a = precomputed cloud coverage
 layout (location = 3) out vec4 gViewData;         // x = view distance, y = atmosphere entry, z = atmosphere exit, w = water path length
+layout (location = 4) out vec4 gMaterialProps;    // x = roughness, y = specular strength, z = mountain mask, w = water mask
 
 // Camera + Lighting
 uniform vec3 camPos;
@@ -176,14 +177,21 @@ bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
     return true;
 }
 
-vec3 landColor(vec3 p, vec3 normal, float h) {
-    vec3 ocean = vec3(0.026, 0.16, 0.32);
-    vec3 coast = vec3(0.82, 0.75, 0.6);
-    vec3 landLow = vec3(0.18, 0.42, 0.2);
-    vec3 landHigh = vec3(0.36, 0.34, 0.22);
-    vec3 landRock = vec3(0.38, 0.36, 0.33);
-    vec3 mountain = vec3(0.55, 0.56, 0.6);
-    vec3 snow = vec3(0.92, 0.95, 0.98);
+struct MaterialInfo {
+    vec3 albedo;
+    float roughness;
+    float specular;
+    float mountain;
+};
+
+MaterialInfo landMaterial(vec3 p, vec3 normal, float h) {
+    vec3 ocean = vec3(0.02, 0.05, 0.08);
+    vec3 coast = vec3(0.10, 0.09, 0.07);
+    vec3 landLow = vec3(0.07, 0.12, 0.07);
+    vec3 landHigh = vec3(0.12, 0.14, 0.10);
+    vec3 landRock = vec3(0.12, 0.12, 0.12);
+    vec3 mountain = vec3(0.16, 0.18, 0.20);
+    vec3 snow = vec3(0.55, 0.57, 0.60);
 
     float seaLevelHeight = seaLevel;
     float heightAboveSea = h - seaLevelHeight;
@@ -210,7 +218,11 @@ vec3 landColor(vec3 p, vec3 normal, float h) {
     color = mix(color, variedLand, landBlend);
     color = mix(color, mountain, mountainBlend);
     color = mix(color, snow, snowBlend);
-    return color;
+
+    float roughness = mix(0.68, 0.38, mountainBlend);
+    float specular = mountainBlend * 0.04;
+
+    return MaterialInfo(color, roughness, specular, mountainBlend);
 }
 
 void main() {
@@ -271,13 +283,20 @@ void main() {
     float heightValue = hit ? terrainHeight(posPlanet) : -1.0;
 
     vec3 baseColor = vec3(0.05, 0.07, 0.1);
+    float roughness = 0.9;
+    float specularStrength = 0.0;
+    float mountainMask = 0.0;
     float waterFlag = -1.0;
     vec3 normalPlanet = normalize(rd);
 
     if (hit) {
         float d0 = planetSDF(posPlanet);
         normalPlanet = computeNormal(posPlanet, d0);
-        baseColor = landColor(posPlanet, normalPlanet, heightValue);
+        MaterialInfo terrainMaterial = landMaterial(posPlanet, normalPlanet, heightValue);
+        baseColor = terrainMaterial.albedo;
+        roughness = terrainMaterial.roughness;
+        specularStrength = terrainMaterial.specular;
+        mountainMask = terrainMaterial.mountain;
         waterFlag = 0.0;
     }
 
@@ -286,8 +305,10 @@ void main() {
         vec3 waterSurfacePos = ro + rd * tWater0;
         posPlanet = waterSurfacePos;
         normalPlanet = normalize(waterSurfacePos);
-        // Preserve the underlying terrain color so the lighting pass can
-        // treat the water as a transparent volume hovering above it.
+        baseColor = waterColor;
+        roughness = 0.05;
+        specularStrength = 0.08;
+        mountainMask = 0.0;
         waterFlag = 1.0;
     } else if (!hit) {
         posPlanet = ro + rd * marchEnd;
@@ -320,5 +341,6 @@ void main() {
     gPositionHeight = vec4(posWorld, heightValue);
     gNormalFlags = vec4(normal, waterFlag);
     gMaterial = vec4(baseColor, coverageHint);
+    gMaterialProps = vec4(roughness, specularStrength, mountainMask, waterFlag > 0.5 ? 1.0 : 0.0);
     gViewData = vec4(viewDistance, atmEntry, atmExit, waterPath);
 }

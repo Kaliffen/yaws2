@@ -5,7 +5,7 @@ import numpy as np
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 SUN_POWER = 1.5
-MOON_POWER = 0.2
+MOON_POWER = 0.5
 MOON_REFLECT_POWER = 1.0
 SCALAR = 1.0
 # Base scale values for the planet and atmosphere (kilometers)
@@ -68,18 +68,18 @@ PLANET_STEP_SCALE = 0.17
 PLANET_MIN_STEP_FACTOR = 0.5
 
 CLOUD_MAX_STEPS = 48
-CLOUD_EXTINCTION = 0.55
+CLOUD_EXTINCTION = 1.155
 CLOUD_PHASE_EXPONENT = 2.5
-CLOUD_ANIMATION_SPEED = 0.006
+CLOUD_ANIMATION_SPEED = 0.002
 
 # Planet orientation
 TILT_DEGREES = 23.5
 TIME_SPEED = 240.0
 
 # Post-processing defaults
-EXPOSURE = 1.1
-WHITE_POINT = 1.4
-GAMMA = 2.2
+EXPOSURE = 0.5
+WHITE_POINT = 0.5
+GAMMA = 1.4
 
 
 def _copy_vector(vec: np.ndarray) -> np.ndarray:

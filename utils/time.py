@@ -1,5 +1,6 @@
 import time
 from dataclasses import dataclass
+import time
 
 import numpy as np
 
@@ -93,3 +94,71 @@ def compute_sun_direction(day_fraction: float, year_fraction: float, tilt_degree
         sun_dir /= norm
 
     return sun_dir
+
+
+def _rotation_matrix(axis: np.ndarray, angle_rad: float) -> np.ndarray:
+    axis = axis / np.linalg.norm(axis)
+    c = np.cos(angle_rad)
+    s = np.sin(angle_rad)
+    t = 1.0 - c
+    x, y, z = axis
+    return np.array(
+        [
+            [t * x * x + c, t * x * y - s * z, t * x * z + s * y],
+            [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
+            [t * x * z - s * y, t * y * z + s * x, t * z * z + c],
+        ],
+        dtype=np.float32,
+    )
+
+
+def compute_moon_direction(
+    total_days: float,
+    sun_direction: np.ndarray,
+    tilt_degrees: float,
+    lunar_cycle_days: float = 29.53,
+    inclination_degrees: float = 5.0,
+) -> np.ndarray:
+    """Compute a moon direction that maintains a realistic angle to the sun.
+
+    The moon orbits once every ``lunar_cycle_days`` with a slight inclination from
+    the planet's equatorial plane. The orbit progresses relative to the sun so the
+    bright side generally faces the night hemisphere instead of aligning with the
+    sunlit side.
+    """
+
+    orbit_fraction = (total_days % lunar_cycle_days) / lunar_cycle_days
+    orbital_angle = 2.0 * np.pi * orbit_fraction
+
+    # Start from the anti-sun direction so the lit hemisphere of the moon
+    # naturally targets the night side of the planet, then let the orbit progress
+    # around the up axis to create phase offsets through the month.
+    base_dir = -np.array(sun_direction, dtype=np.float32)
+    if np.linalg.norm(base_dir) < 1e-6:
+        base_dir = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+    else:
+        base_dir /= np.linalg.norm(base_dir)
+
+    up_axis = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+    moon_in_plane = _rotation_matrix(up_axis, orbital_angle) @ base_dir
+
+    incl = np.deg2rad(inclination_degrees)
+    tilt = np.deg2rad(tilt_degrees)
+    inclination_axis = np.cross(up_axis, moon_in_plane)
+    if np.linalg.norm(inclination_axis) < 1e-6:
+        inclination_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    inclination_axis /= np.linalg.norm(inclination_axis)
+
+    tilt_matrix = np.array(
+        [[1.0, 0.0, 0.0], [0.0, np.cos(tilt), -np.sin(tilt)], [0.0, np.sin(tilt), np.cos(tilt)]],
+        dtype=np.float32,
+    )
+
+    inclined_dir = _rotation_matrix(inclination_axis, incl) @ moon_in_plane
+    moon_dir = tilt_matrix @ inclined_dir
+
+    norm = np.linalg.norm(moon_dir)
+    if norm > 1e-6:
+        moon_dir /= norm
+
+    return moon_dir

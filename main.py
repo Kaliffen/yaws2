@@ -70,7 +70,12 @@ def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
     editing_params.max_ray_distance = editing_params.planet_radius * config["max_ray_distance_factor"]
 
 
-def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.ndarray):
+def draw_parameter_panel(
+    editing_params: PlanetParameters,
+    sun_direction: np.ndarray,
+    moon_direction: np.ndarray,
+    moon_intensity: float,
+):
     io = imgui.get_io()
     right_panel_width = max(io.display_size.x * 0.28, 360.0)
     imgui.set_next_window_position(
@@ -83,6 +88,15 @@ def draw_parameter_panel(editing_params: PlanetParameters, sun_direction: np.nda
     imgui.text(f"x: {sun_direction[0]:+.3f}  y: {sun_direction[1]:+.3f}  z: {sun_direction[2]:+.3f}")
 
     _, editing_params.sun_power = imgui.slider_float("Sun power", editing_params.sun_power, 0.0, 25.0)
+
+    imgui.separator()
+    imgui.text("Moon direction (simulated)")
+    imgui.text(f"x: {moon_direction[0]:+.3f}  y: {moon_direction[1]:+.3f}  z: {moon_direction[2]:+.3f}")
+    imgui.text(f"Moon phase power: {moon_intensity:.3f}")
+    _, editing_params.moon_power = imgui.slider_float("Moon base power", editing_params.moon_power, 0.0, 2.0)
+    _, editing_params.moon_reflect_power = imgui.slider_float(
+        "Moon reflected sunlight", editing_params.moon_reflect_power, 0.0, 3.0
+    )
 
     _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
 
@@ -405,6 +419,8 @@ def main():
         calendar_state = calendar.advance(dt, editing_params.time_speed)
         renderer.prepare_frame_state(calendar_state)
         current_sun_direction = renderer.sun_direction
+        current_moon_direction = renderer.moon_direction
+        current_moon_intensity = renderer.moon_intensity
         spin_delta = renderer.planet_to_world @ prev_world_to_planet
         glfw.poll_events()
         imgui_renderer.process_inputs()
@@ -594,6 +610,8 @@ def main():
             )
             renderer.prepare_frame_state(calendar_state)
             current_sun_direction = renderer.sun_direction
+            current_moon_direction = renderer.moon_direction
+            current_moon_intensity = renderer.moon_intensity
             calendar_edit_state.update(
                 {
                     "day": calendar_state.day_index + 1,
@@ -612,7 +630,12 @@ def main():
             else:
                 camera.enable_reference_alignment(False)
             camera.update_vectors()
-        update_clicked, reset_clicked = draw_parameter_panel(editing_params, current_sun_direction)
+        update_clicked, reset_clicked = draw_parameter_panel(
+            editing_params,
+            current_sun_direction,
+            current_moon_direction,
+            current_moon_intensity,
+        )
 
         if update_clicked:
             parameters = editing_params.copy()

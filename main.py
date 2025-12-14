@@ -8,7 +8,13 @@ from pyrr import Quaternion
 from gl_utils.program import create_compute_program, create_program
 from gl_utils.buffers import create_fullscreen_quad
 from gl_utils.camera import QuaternionCamera
-from rendering.constants import PlanetParameters, default_planet_parameters, SCALAR
+from rendering.constants import (
+    PlanetParameters,
+    PostProcessParameters,
+    default_planet_parameters,
+    default_postprocess_parameters,
+    SCALAR,
+)
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer, PlanetCalendar
 from utils.persistence import load_camera_bookmark, save_camera_bookmark
@@ -165,6 +171,7 @@ def draw_parameter_panel(
 
 def draw_performance_panel(
     editing_params: PlanetParameters,
+    post_process_params: PostProcessParameters,
     calendar_state,
     days_in_year: int,
     hours_per_day: int,
@@ -270,6 +277,30 @@ def draw_performance_panel(
         "Camera FOV (deg)", camera_fov_degrees, 35.0, 120.0
     )
 
+    imgui.separator()
+    imgui.text("Post-processing")
+    _, post_process_params.enable_tonemapping = imgui.checkbox(
+        "Enable tonemapping", post_process_params.enable_tonemapping
+    )
+    _, post_process_params.exposure = imgui.slider_float(
+        "Exposure",
+        post_process_params.exposure,
+        0.1,
+        5.0,
+    )
+    _, post_process_params.white_point = imgui.slider_float(
+        "White point",
+        post_process_params.white_point,
+        0.5,
+        6.0,
+    )
+    _, post_process_params.gamma = imgui.slider_float(
+        "Gamma",
+        post_process_params.gamma,
+        1.4,
+        3.0,
+    )
+
     imgui.end()
     return (
         camera_fov_degrees,
@@ -316,6 +347,8 @@ def main():
         cloud_src = f.read()
     with open("shaders/composite.frag") as f:
         composite_src = f.read()
+    with open("shaders/postprocess.frag") as f:
+        postprocess_src = f.read()
     with open("shaders/surface_info.comp") as f:
         surface_info_src = f.read()
 
@@ -324,12 +357,15 @@ def main():
     atmosphere_program = create_program(vert_src, atmosphere_src)
     cloud_program = create_program(vert_src, cloud_src)
     composite_program = create_program(vert_src, composite_src)
+    post_process_program = create_program(vert_src, postprocess_src)
     surface_info_program = create_compute_program(surface_info_src)
 
     glUseProgram(gbuffer_program)
 
     parameters = default_planet_parameters()
     editing_params = parameters.copy()
+    post_process_params = default_postprocess_parameters()
+    editing_post_params = post_process_params.copy()
 
     camera = QuaternionCamera(
         position=(0.0, 0.0, parameters.planet_radius * 1.6),
@@ -356,8 +392,10 @@ def main():
         atmosphere_program,
         cloud_program,
         composite_program,
+        post_process_program,
         surface_info_program,
         parameters,
+        post_process_params,
     )
     timer = DeltaTimer()
     calendar = PlanetCalendar()
@@ -468,6 +506,7 @@ def main():
             save_bookmark_clicked,
         ) = draw_performance_panel(
             editing_params,
+            editing_post_params,
             calendar_state,
             calendar.days_in_year,
             calendar.hours_per_day,
@@ -516,10 +555,14 @@ def main():
 
         if update_clicked:
             parameters = editing_params.copy()
+            post_process_params = editing_post_params.copy()
             renderer.update_parameters(parameters)
+            renderer.update_postprocess_parameters(post_process_params)
             editing_params = parameters.copy()
+            editing_post_params = post_process_params.copy()
         elif reset_clicked:
             editing_params = parameters.copy()
+            editing_post_params = post_process_params.copy()
 
         glViewport(0, 0, width, height)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)

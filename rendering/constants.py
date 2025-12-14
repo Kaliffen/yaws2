@@ -76,6 +76,11 @@ CLOUD_ANIMATION_SPEED = 0.006
 TILT_DEGREES = 23.5
 TIME_SPEED = 240.0
 
+# Post-processing defaults
+EXPOSURE = 1.1
+WHITE_POINT = 1.4
+GAMMA = 2.2
+
 
 def _copy_vector(vec: np.ndarray) -> np.ndarray:
     return np.array(vec, dtype=np.float32)
@@ -175,3 +180,23 @@ def default_planet_parameters() -> PlanetParameters:
     params = PlanetParameters()
     params.scale_with_planet_radius()
     return params
+
+
+@dataclass
+class PostProcessParameters:
+    exposure: float = EXPOSURE
+    white_point: float = WHITE_POINT
+    gamma: float = GAMMA
+    enable_tonemapping: bool = True
+
+    def copy(self) -> "PostProcessParameters":
+        return PostProcessParameters(
+            exposure=self.exposure,
+            white_point=self.white_point,
+            gamma=self.gamma,
+            enable_tonemapping=self.enable_tonemapping,
+        )
+
+
+def default_postprocess_parameters() -> PostProcessParameters:
+    return PostProcessParameters()

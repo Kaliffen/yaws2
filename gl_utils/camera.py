@@ -29,124 +29,75 @@ class FPSCamera:
         self.pitch = pitch
         self.roll = 0.0
         self.fov_degrees = fov_degrees
-        self.front = np.array([0.0, 0.0, -1.0], dtype=np.float32)
-        self.right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        self.up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
-        self.orientation = quaternion.create()
+
         self.speed = 5.0
         self.sensitivity = 0.1
         self.roll_speed = 90.0
         self.min_radius = None
-        self.reference_up = WORLD_UP.copy()
-        self.use_reference_up = True
-        self.velocity = np.zeros(3, dtype=np.float32)
+
+        self.orientation = quaternion.create()
+        self.front = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        self.right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        self.up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
         self._rebuild_orientation()
-        self.update_vectors()
+        self._update_basis()
 
-    def set_reference_up(self, up_vector: np.ndarray):
-        self.reference_up = normalize(up_vector)
-
-    def enable_reference_alignment(self, enabled: bool):
-        self.use_reference_up = enabled
-        if enabled:
-            self.roll = 0.0
-            self._align_up_with_reference()
+    def update_vectors(self):
+        self._rebuild_orientation()
+        self._update_basis()
 
     def _rebuild_orientation(self):
-        """Build an orientation quaternion from yaw/pitch state."""
         self.orientation = quaternion.create()
 
-        yaw_q = _safe_quaternion(self.reference_up, np.radians(self.yaw))
+        yaw_q = _safe_quaternion(WORLD_UP, np.radians(self.yaw))
         self.orientation = quaternion.cross(yaw_q, self.orientation)
 
         right_axis = _apply_quaternion(self.orientation, np.array([1.0, 0.0, 0.0], dtype=np.float32))
         pitch_q = _safe_quaternion(right_axis, np.radians(self.pitch))
-        self.orientation = quaternion.cross(self.orientation, pitch_q)
+        self.orientation = quaternion.cross(pitch_q, self.orientation)
+
+        forward_axis = _apply_quaternion(
+            self.orientation, np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        )
+        roll_q = _safe_quaternion(forward_axis, np.radians(self.roll))
+        self.orientation = quaternion.cross(roll_q, self.orientation)
 
         self.orientation = quaternion.normalise(self.orientation)
 
-    def _align_up_with_reference(self):
-        """Rotate the current orientation so its up matches the reference vector."""
-        self.update_vectors()
-        target_up = normalize(self.reference_up)
-        current_up = self.up
-
-        axis = np.cross(current_up, target_up)
-        axis_len = np.linalg.norm(axis)
-        dot_up = float(np.clip(np.dot(current_up, target_up), -1.0, 1.0))
-
-        if axis_len < 1e-6:
-            if dot_up < 0.0:
-                axis = self.front
-                angle = np.pi
-            else:
-                return
-        else:
-            angle = np.arccos(dot_up)
-
-        alignment = _safe_quaternion(axis, angle)
-        self.orientation = quaternion.normalise(quaternion.cross(alignment, self.orientation))
-        self.update_vectors()
-
-    def update_vectors(self):
-        # Apply the quaternion directly to each canonical basis axis so roll and
-        # near-vertical pitch preserve a consistent view-up direction. Deriving
-        # one axis from another via cross products can flip when the forward
-        # vector approaches the reference up direction, which made yaw behave
-        # like roll at extreme pitches.
+    def _update_basis(self):
         self.front = normalize(
             _apply_quaternion(self.orientation, np.array([0.0, 0.0, -1.0], dtype=np.float32))
         )
-        self.up = normalize(
-            _apply_quaternion(self.orientation, np.array([0.0, 1.0, 0.0], dtype=np.float32))
+        self.right = normalize(
+            _apply_quaternion(self.orientation, np.array([1.0, 0.0, 0.0], dtype=np.float32))
         )
-        self.right = normalize(np.cross(self.front, self.up))
+        self.up = normalize(np.cross(self.right, self.front))
 
     def process_mouse(self, xoff, yoff):
-        roll_rad = np.radians(-self.roll)
-        cos_r = np.cos(roll_rad)
-        sin_r = np.sin(roll_rad)
-
-        rotated_x = xoff * cos_r - yoff * sin_r
-        rotated_y = xoff * sin_r + yoff * cos_r
-
-        xoff = rotated_x * self.sensitivity
-        yoff = rotated_y * self.sensitivity
-
-        if self.use_reference_up:
-            prev_pitch = self.pitch
-            self.yaw += xoff
-            self.pitch = max(-89.0, min(89.0, self.pitch + yoff))
-
-            yaw_delta = np.radians(xoff)
-            pitch_delta = np.radians(self.pitch - prev_pitch)
-
-            yaw_q = _safe_quaternion(self.reference_up, yaw_delta)
-            self.orientation = quaternion.cross(yaw_q, self.orientation)
-
-            self.update_vectors()
-            pitch_axis = self.right
-            pitch_q = _safe_quaternion(pitch_axis, pitch_delta)
-            self.orientation = quaternion.cross(self.orientation, pitch_q)
-        else:
-            prev_pitch = self.pitch
-            self.yaw += xoff
-            self.pitch = max(-89.0, min(89.0, self.pitch + yoff))
-
-            yaw_q = _safe_quaternion(self.up, np.radians(xoff))
-            pitch_delta = np.radians(self.pitch - prev_pitch)
-            pitch_q = _safe_quaternion(self.right, pitch_delta)
-
-            self.orientation = quaternion.cross(self.orientation, yaw_q)
-            self.orientation = quaternion.cross(self.orientation, pitch_q)
-
-        self.orientation = quaternion.normalise(self.orientation)
-        self.update_vectors()
-
-    def process_roll(self, direction, dt):
-        if self.use_reference_up:
+        if xoff == 0 and yoff == 0:
             return
 
+        yaw_delta = xoff * self.sensitivity
+        pitch_delta = yoff * self.sensitivity
+
+        self.yaw += yaw_delta
+        prev_pitch = self.pitch
+        self.pitch = max(-89.0, min(89.0, self.pitch + pitch_delta))
+        pitch_delta = self.pitch - prev_pitch
+
+        yaw_q = _safe_quaternion(self.up, np.radians(yaw_delta))
+        self.orientation = quaternion.cross(yaw_q, self.orientation)
+
+        self._update_basis()
+
+        pitch_q = _safe_quaternion(self.right, np.radians(pitch_delta))
+        self.orientation = quaternion.cross(pitch_q, self.orientation)
+
+        self.orientation = quaternion.normalise(self.orientation)
+        self._update_basis()
+
+    def process_roll(self, direction, dt):
         delta = 0.0
         if direction == "LEFT":
             delta = self.roll_speed * dt
@@ -159,22 +110,25 @@ class FPSCamera:
         self.roll = (self.roll + delta) % 360.0
 
         roll_q = _safe_quaternion(self.front, np.radians(delta))
-        self.orientation = quaternion.normalise(quaternion.cross(self.orientation, roll_q))
-        self.update_vectors()
+        self.orientation = quaternion.cross(roll_q, self.orientation)
+        self.orientation = quaternion.normalise(self.orientation)
+        self._update_basis()
 
     def process_movement(self, direction, dt):
         velocity = self.speed * dt
-        if direction == "FAST":
-            velocity *= 5
-            return
+
         if direction == "FORWARD":
             self.position += self.front * velocity
-        if direction == "BACKWARD":
+        elif direction == "BACKWARD":
             self.position -= self.front * velocity
-        if direction == "LEFT":
+        elif direction == "LEFT":
             self.position -= self.right * velocity
-        if direction == "RIGHT":
+        elif direction == "RIGHT":
             self.position += self.right * velocity
+        elif direction == "UP":
+            self.position += self.up * velocity
+        elif direction == "DOWN":
+            self.position -= self.up * velocity
 
         if self.min_radius is not None:
             dist = np.linalg.norm(self.position)

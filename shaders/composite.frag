@@ -230,7 +230,15 @@ void main() {
     }
 
     if (level >= 9) {
-        composite += clouds;
+        // Attenuate cloud brightness when viewed through the atmosphere so the
+        // orbital view matches the in-atmosphere exposure. When the camera is
+        // outside the atmosphere the transmittance can be significantly below
+        // one, so apply it to the cloud contribution instead of letting it stay
+        // fully bright.
+        float cloudAtmosphereBlend = hitSurface
+            ? mix(1.0, atmosphereTransmittance, 0.55)
+            : atmosphereTransmittance;
+        composite += clouds * cloudAtmosphereBlend;
     }
 
     if (level >= 7) {

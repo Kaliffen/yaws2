@@ -34,13 +34,17 @@ vec3 decodeViewData(vec2 uv) {
 }
 
 bool planetOccludes(vec3 camPlanet, vec3 dir) {
-    float radius = max(planetRadius, atmosphereRadius);
+    // Use the solid planet radius so the atmosphere itself doesn't mask the sun,
+    // and consider both roots so the test works when the camera starts inside
+    // the atmospheric shell.
     float b = dot(camPlanet, dir);
-    float c = dot(camPlanet, camPlanet) - radius * radius;
+    float c = dot(camPlanet, camPlanet) - planetRadius * planetRadius;
     float h = b * b - c;
     if (h < 0.0) return false;
-    float t = -b - sqrt(h);
-    return t > 0.0;
+    float sqrtH = sqrt(h);
+    float tNear = -b - sqrtH;
+    float tFar = -b + sqrtH;
+    return tFar > 0.0 && (tNear > 0.0 || length(camPlanet) > planetRadius);
 }
 
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {

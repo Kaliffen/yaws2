@@ -1,145 +1,128 @@
-import numpy as np
-
-WORLD_UP = np.array([0.0, 1.0, 0.0], dtype=np.float32)
-
-
-def normalize(v):
-    norm = np.linalg.norm(v)
-    if norm < 1e-8:
-        return np.array(v, dtype=np.float32)
-    return (v / norm).astype(np.float32)
+import json
+import math
+from pyrr import Vector3, Quaternion, matrix44, vector
 
 
-def _rotation_matrix(axis: np.ndarray, angle_rad: float) -> np.ndarray:
-    axis = normalize(axis)
-    c = np.cos(angle_rad)
-    s = np.sin(angle_rad)
-    t = 1.0 - c
-    x, y, z = axis
-    return np.array(
-        [
-            [t * x * x + c, t * x * y - s * z, t * x * z + s * y],
-            [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
-            [t * x * z - s * y, t * y * z + s * x, t * z * z + c],
-        ],
-        dtype=np.float32,
-    )
+class QuaternionCamera:
+    def __init__(
+        self,
+        position=(0.0, 0.0, 5.0),
+        speed=11112.5,
+        sensitivity=0.1,
+        size=(800.0, 600.0),
+        near=0.1,
+        far=1000.0,
+        fovy=65.0,
+    ):
+        self.perspective = {
+            "width": size[0],
+            "height": size[1],
+            "near": near,
+            "far": far,
+            "fovy": fovy,
+        }
+        self.position = Vector3(position, dtype="f")
+        self.world_up = Vector3([0.0, 1.0, 0.0], dtype="f")
+        self.speed = speed
+        self.sensitivity = sensitivity
+        self.rotation = Quaternion([0.0, 0.0, 0.0, 1.0])
 
+        self.update_camera_vectors()
 
-class FPSCamera:
-    def __init__(self, position, yaw, pitch, fov_degrees: float = 70.0):
-        self.position = position.astype(np.float32)
-        self.yaw = yaw
-        self.pitch = pitch
-        self.roll = 0.0
-        self.fov_degrees = fov_degrees
-        self.front = np.array([0.0, 0.0, -1.0], dtype=np.float32)
-        self.right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        self.up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
-        self.speed = 5.0
-        self.sensitivity = 0.1
-        self.roll_speed = 90.0
-        self.min_radius = None
-        self.reference_up = WORLD_UP.copy()
-        self.use_reference_up = True
-        self.velocity = np.zeros(3, dtype=np.float32)
-        self.update_vectors()
+    @property
+    def fov_degrees(self):
+        return float(self.perspective["fovy"])
 
-    def set_reference_up(self, up_vector: np.ndarray):
-        self.reference_up = normalize(up_vector)
+    @fov_degrees.setter
+    def fov_degrees(self, value):
+        self.perspective["fovy"] = float(value)
 
-    def enable_reference_alignment(self, enabled: bool):
-        self.use_reference_up = enabled
-        if enabled:
-            self.roll = 0.0
+    def print_state(self):
+        """Return the state of the camera as a JSON string."""
+        state = {
+            "position": self.position.tolist(),
+            "speed": self.speed,
+            "sensitivity": self.sensitivity,
+            "perspective": self.perspective,
+            "rotation": self.rotation.tolist(),
+        }
+        return json.dumps(state)
 
-    def update_vectors(self):
-        yaw_r = np.radians(self.yaw)
-        pitch_r = np.radians(self.pitch)
+    def load_state(self, state):
+        self.position = Vector3(state["position"], dtype="f")
+        self.speed = state["speed"]
+        self.sensitivity = state["sensitivity"]
+        self.perspective = state["perspective"]
+        self.rotation = Quaternion(state["rotation"])
+        self.update_camera_vectors()
 
-        fx = np.cos(yaw_r) * np.cos(pitch_r)
-        fy = np.sin(pitch_r)
-        fz = np.sin(yaw_r) * np.cos(pitch_r)
+    def update_camera_vectors(self):
+        """Update direction vectors based on the quaternion rotation."""
+        self.front = vector.normalize(self.rotation * Vector3([0.0, 0.0, -1.0]))
+        self.right = vector.normalize(self.rotation * Vector3([1.0, 0.0, 0.0]))
+        self.up = vector.normalize(self.rotation * Vector3([0.0, 1.0, 0.0]))
 
-        base_front = normalize(np.array([fx, fy, fz], dtype=np.float32))
-        base_right = normalize(np.cross(base_front, WORLD_UP))
-        base_up = normalize(np.cross(base_right, base_front))
+    def get_view_matrix(self):
+        """Create a view matrix using the position and quaternion-based orientation."""
+        target = self.position + self.front
+        return matrix44.create_look_at(self.position, target, self.up)
 
-        if self.use_reference_up:
-            target_up = normalize(self.reference_up)
-            alignment_axis = np.cross(WORLD_UP, target_up)
-            alignment_axis_norm = np.linalg.norm(alignment_axis)
-            dot_up = float(np.clip(np.dot(WORLD_UP, target_up), -1.0, 1.0))
+    def get_projection_matrix(self):
+        return matrix44.create_perspective_projection_matrix(
+            self.perspective["fovy"],
+            self.perspective["width"] / self.perspective["height"],
+            self.perspective["near"],
+            self.perspective["far"],
+        )
 
-            if alignment_axis_norm < 1e-6:
-                if dot_up < 0.0:
-                    alignment_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-                    angle = np.pi
-                else:
-                    self.front = base_front
-                    self.right = base_right
-                    self.up = base_up
-                    return
-            else:
-                alignment_axis = alignment_axis / alignment_axis_norm
-                angle = np.arccos(dot_up)
+    def move(self, direction, delta_time, boost=False, turbo=False):
+        """Move the camera in the specified direction."""
+        camera_speed = self.speed * (10.0 if boost else 1.0) * (4 if turbo else 1.0) * delta_time
 
-            rotation = _rotation_matrix(alignment_axis, angle)
-            self.front = normalize(rotation @ base_front)
-            self.right = normalize(rotation @ base_right)
-            self.up = normalize(rotation @ base_up)
-            return
-
-        roll_rotation = _rotation_matrix(base_front, np.radians(self.roll))
-        self.front = base_front
-        self.right = normalize(roll_rotation @ base_right)
-        self.up = normalize(roll_rotation @ base_up)
-
-    def process_mouse(self, xoff, yoff):
-        roll_rad = np.radians(-self.roll)
-        cos_r = np.cos(roll_rad)
-        sin_r = np.sin(roll_rad)
-
-        rotated_x = xoff * cos_r - yoff * sin_r
-        rotated_y = xoff * sin_r + yoff * cos_r
-
-        xoff = rotated_x * self.sensitivity
-        yoff = rotated_y * self.sensitivity
-
-        self.yaw += xoff
-        self.pitch += yoff
-
-        self.pitch = max(-89.0, min(89.0, self.pitch))
-
-        self.update_vectors()
-
-    def process_roll(self, direction, dt):
-        if direction == "LEFT":
-            self.roll += self.roll_speed * dt
-        elif direction == "RIGHT":
-            self.roll -= self.roll_speed * dt
-
-        self.roll = (self.roll + 360.0) % 360.0
-        self.update_vectors()
-
-    def process_movement(self, direction, dt):
-        velocity = self.speed * dt
-        if direction == "FAST":
-            velocity *= 5
-            return
         if direction == "FORWARD":
-            self.position += self.front * velocity
-        if direction == "BACKWARD":
-            self.position -= self.front * velocity
-        if direction == "LEFT":
-            self.position -= self.right * velocity
-        if direction == "RIGHT":
-            self.position += self.right * velocity
+            self.position += camera_speed * self.front
+        elif direction == "BACKWARD":
+            self.position -= camera_speed * self.front
+        elif direction == "LEFT":
+            self.position -= camera_speed * self.right
+        elif direction == "RIGHT":
+            self.position += camera_speed * self.right
+        elif direction == "UP":
+            self.position += camera_speed * self.up
+        elif direction == "DOWN":
+            self.position -= camera_speed * self.up
 
-        if self.min_radius is not None:
-            dist = np.linalg.norm(self.position)
-            if dist < self.min_radius:
-                if dist > 1e-6:
-                    self.position = normalize(self.position) * self.min_radius
-                else:
-                    self.position = np.array([0, 0, self.min_radius], dtype=np.float32)
+    def rotate(self, x_offset, y_offset):
+        """Rotate the camera based on mouse movement."""
+        x_offset *= self.sensitivity
+        y_offset *= self.sensitivity
+
+        yaw_offset = Quaternion.from_y_rotation(-math.radians(x_offset))
+        pitch_offset = Quaternion.from_x_rotation(math.radians(y_offset))
+
+        self.rotation = self.rotation * pitch_offset * yaw_offset
+        self.rotation = self.rotation.normalised
+        self.update_camera_vectors()
+
+    def adjust_roll(self, roll_offset):
+        """Adjust the camera roll."""
+        roll_quat = Quaternion.from_z_rotation(math.radians(roll_offset * self.sensitivity*10))
+        self.rotation = self.rotation * roll_quat
+        self.rotation = self.rotation.normalised
+        self.update_camera_vectors()
+
+    def handle_keyboard_input(self, key, delta_time, boost=False, turbo=False):
+        """Handle keyboard input for movement and roll adjustment."""
+        if key in ["FORWARD", "BACKWARD", "LEFT", "RIGHT", "UP", "DOWN"]:
+            self.move(key, delta_time, boost, turbo)
+        elif key == "ROLL_LEFT":
+            self.adjust_roll(-10.0)
+        elif key == "ROLL_RIGHT":
+            self.adjust_roll(10.0)
+
+    def on_window_focus(self, focused):
+        """Handle window focus changes."""
+        if not focused:
+            self.last_mouse_pos = None
+        else:
+            self.last_mouse_pos = None

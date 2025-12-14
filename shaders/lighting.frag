@@ -44,7 +44,7 @@ vec3 computeSunTint(vec3 position, vec3 lightDir) {
     float sunHeight = clamp(dot(normalize(position), lightDir), -1.0, 1.0);
 
     float dayFactor = smoothstep(-0.02, 0.08, sunHeight);
-    float goldenBand = 1.0 - smoothstep(0.01, 0.25, abs(sunHeight));
+    float goldenBand = 1.0 - smoothstep(0.01, 0.1, abs(sunHeight));
 
     vec3 nightColor = vec3(0.04, 0.07, 0.12);
     vec3 dayColor = vec3(0.94, 0.95, 0.93);
@@ -151,9 +151,8 @@ void main() {
     float sunVisibility = smoothstep(-0.02, 0.04, sunHeight) * sunPresence;
     vec3 effectiveSunColor = sunColor * sunVisibility;
     float twilight = smoothstep(-0.18, 0.04, sunHeight) * sunPresence;
-    float ambientScale = mix(0.08, 1.0, sunPresence);
-    vec3 ambientLight = mix(vec3(0.01, 0.02, 0.03), vec3(0.12, 0.18, 0.28), twilight) * ambientScale;
-    float ambientStrength = mix(0.01, 0.12, twilight) * ambientScale;
+    vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
+    float ambientStrength = mix(0.02, 0.14, twilight);
 
     float moonIntensity = max(moonPower, 0.0);
     float moonVisibility = smoothstep(-0.26, 0.02, moonHeight);

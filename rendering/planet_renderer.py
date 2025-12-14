@@ -250,6 +250,10 @@ class PlanetRenderer:
         glBindTexture(GL_TEXTURE_2D, self.gbuffer["view_data"])
         set_int(self.lighting_program, "gViewData", 3)
 
+        glActiveTexture(GL_TEXTURE4)
+        glBindTexture(GL_TEXTURE_2D, self.gbuffer["material_props"])
+        set_int(self.lighting_program, "gMaterialProps", 4)
+
         glDrawArrays(GL_TRIANGLES, 0, 6)
 
         # Pass 3: atmosphere

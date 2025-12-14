@@ -338,7 +338,7 @@ def main():
     )
     # Start with a modest base speed so surface traversal feels grounded. Speed
     # ramps up automatically as you get farther from the planet.
-    base_speed = 60.0 * SCALAR
+    base_speed = 100.0 * SCALAR
     camera.speed = base_speed
 
     bookmark_loaded = False

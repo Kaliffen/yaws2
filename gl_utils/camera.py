@@ -7,7 +7,7 @@ class QuaternionCamera:
     def __init__(
         self,
         position=(0.0, 0.0, 5.0),
-        speed=2.5,
+        speed=11112.5,
         sensitivity=0.1,
         size=(800.0, 600.0),
         near=0.1,
@@ -98,7 +98,7 @@ class QuaternionCamera:
         y_offset *= self.sensitivity
 
         yaw_offset = Quaternion.from_y_rotation(-math.radians(x_offset))
-        pitch_offset = Quaternion.from_x_rotation(-math.radians(y_offset))
+        pitch_offset = Quaternion.from_x_rotation(math.radians(y_offset))
 
         self.rotation = self.rotation * pitch_offset * yaw_offset
         self.rotation = self.rotation.normalised
@@ -106,7 +106,7 @@ class QuaternionCamera:
 
     def adjust_roll(self, roll_offset):
         """Adjust the camera roll."""
-        roll_quat = Quaternion.from_z_rotation(math.radians(roll_offset * self.sensitivity))
+        roll_quat = Quaternion.from_z_rotation(math.radians(roll_offset * self.sensitivity*10))
         self.rotation = self.rotation * roll_quat
         self.rotation = self.rotation.normalised
         self.update_camera_vectors()

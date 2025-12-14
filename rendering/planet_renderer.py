@@ -83,9 +83,13 @@ class PlanetRenderer:
 
     def _update_moon_direction(self, day_index: int, day_fraction: float) -> None:
         total_days = float(day_index) + float(day_fraction)
-        self.moon_direction = compute_moon_direction(total_days, self.parameters.tilt_degrees)
+        self.moon_direction = compute_moon_direction(
+            total_days, self.sun_direction, self.parameters.tilt_degrees
+        )
         phase = 0.5 * (1.0 - float(np.dot(self.sun_direction, self.moon_direction)))
-        self.moon_intensity = max(self.parameters.moon_power * phase, 0.0)
+        self.moon_intensity = max(
+            self.parameters.moon_power * self.parameters.moon_reflect_power * phase, 0.0
+        )
 
     def _ensure_gbuffer(self, width, height):
         if self.gbuffer and self.gbuffer["width"] == width and self.gbuffer["height"] == height:
@@ -147,7 +151,7 @@ class PlanetRenderer:
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
         self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
-        self.moon_intensity = parameters.moon_power
+        self.moon_intensity = parameters.moon_power * parameters.moon_reflect_power
 
     def query_surface_info(self, query_pos, min_altitude_offset=0.0):
         if self.surface_info_program is None:

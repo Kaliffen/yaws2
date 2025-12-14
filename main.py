@@ -94,6 +94,9 @@ def draw_parameter_panel(
     imgui.text(f"x: {moon_direction[0]:+.3f}  y: {moon_direction[1]:+.3f}  z: {moon_direction[2]:+.3f}")
     imgui.text(f"Moon phase power: {moon_intensity:.3f}")
     _, editing_params.moon_power = imgui.slider_float("Moon base power", editing_params.moon_power, 0.0, 2.0)
+    _, editing_params.moon_reflect_power = imgui.slider_float(
+        "Moon reflected sunlight", editing_params.moon_reflect_power, 0.0, 3.0
+    )
 
     _, editing_params.tilt_degrees = imgui.slider_float("Tilt (deg)", editing_params.tilt_degrees, 0.0, 45.0)
 

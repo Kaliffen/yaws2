@@ -40,6 +40,7 @@ class FPSCamera:
         self.reference_up = WORLD_UP.copy()
         self.use_reference_up = True
         self.velocity = np.zeros(3, dtype=np.float32)
+        self._rebuild_orientation()
         self.update_vectors()
 
     def set_reference_up(self, up_vector: np.ndarray):
@@ -49,58 +50,48 @@ class FPSCamera:
         self.use_reference_up = enabled
         if enabled:
             self.roll = 0.0
+            self._align_up_with_reference()
+
+    def _rebuild_orientation(self):
+        """Build an orientation quaternion from yaw/pitch state."""
+        self.orientation = quaternion.create()
+
+        yaw_q = _safe_quaternion(self.reference_up, np.radians(self.yaw))
+        self.orientation = quaternion.cross(yaw_q, self.orientation)
+
+        right_axis = _apply_quaternion(self.orientation, np.array([1.0, 0.0, 0.0], dtype=np.float32))
+        pitch_q = _safe_quaternion(right_axis, np.radians(self.pitch))
+        self.orientation = quaternion.cross(self.orientation, pitch_q)
+
+        self.orientation = quaternion.normalise(self.orientation)
+
+    def _align_up_with_reference(self):
+        """Rotate the current orientation so its up matches the reference vector."""
+        self.update_vectors()
+        target_up = normalize(self.reference_up)
+        current_up = self.up
+
+        axis = np.cross(current_up, target_up)
+        axis_len = np.linalg.norm(axis)
+        dot_up = float(np.clip(np.dot(current_up, target_up), -1.0, 1.0))
+
+        if axis_len < 1e-6:
+            if dot_up < 0.0:
+                axis = self.front
+                angle = np.pi
+            else:
+                return
+        else:
+            angle = np.arccos(dot_up)
+
+        alignment = _safe_quaternion(axis, angle)
+        self.orientation = quaternion.normalise(quaternion.cross(alignment, self.orientation))
+        self.update_vectors()
 
     def update_vectors(self):
-        yaw_r = np.radians(self.yaw)
-        pitch_r = np.radians(self.pitch)
-        roll_r = np.radians(self.roll if not self.use_reference_up else 0.0)
-
-        fx = np.cos(yaw_r) * np.cos(pitch_r)
-        fy = np.sin(pitch_r)
-        fz = np.sin(yaw_r) * np.cos(pitch_r)
-
-        base_front = normalize(np.array([fx, fy, fz], dtype=np.float32))
-
-        base_right = np.cross(base_front, WORLD_UP)
-        if np.linalg.norm(base_right) < 1e-6:
-            base_right = np.cross(base_front, np.array([0.0, 0.0, 1.0], dtype=np.float32))
-        base_right = normalize(base_right)
-        base_up = normalize(np.cross(base_right, base_front))
-
-        if not self.use_reference_up and abs(roll_r) > 1e-8:
-            roll_rotation = _safe_quaternion(base_front, roll_r)
-            base_right = normalize(_apply_quaternion(roll_rotation, base_right))
-            base_up = normalize(np.cross(base_right, base_front))
-
-        if self.use_reference_up:
-            target_up = normalize(self.reference_up)
-            alignment_axis = np.cross(base_up, target_up)
-            axis_len = np.linalg.norm(alignment_axis)
-            dot_up = float(np.clip(np.dot(base_up, target_up), -1.0, 1.0))
-
-            if axis_len < 1e-6:
-                if dot_up < 0.0:
-                    alignment_rotation = _safe_quaternion(base_right, np.pi)
-                else:
-                    alignment_rotation = quaternion.create()
-            else:
-                alignment_rotation = _safe_quaternion(alignment_axis, np.arccos(dot_up))
-
-            base_front = normalize(_apply_quaternion(alignment_rotation, base_front))
-            base_right = normalize(np.cross(base_front, target_up))
-            base_up = normalize(np.cross(base_right, base_front))
-
-        rotation_matrix = np.stack((base_right, base_up, -base_front), axis=1)
-        try:
-            self.orientation = quaternion.normalise(quaternion.create_from_matrix(rotation_matrix))
-        except Exception:
-            rotation_4x4 = np.eye(4, dtype=np.float32)
-            rotation_4x4[:3, :3] = rotation_matrix
-            self.orientation = quaternion.normalise(quaternion.create_from_matrix(rotation_4x4))
-
-        self.front = base_front
-        self.right = base_right
-        self.up = base_up
+        self.front = normalize(_apply_quaternion(self.orientation, np.array([0.0, 0.0, -1.0], dtype=np.float32)))
+        self.right = normalize(_apply_quaternion(self.orientation, np.array([1.0, 0.0, 0.0], dtype=np.float32)))
+        self.up = normalize(np.cross(self.right, self.front))
 
     def process_mouse(self, xoff, yoff):
         roll_rad = np.radians(-self.roll)
@@ -113,20 +104,53 @@ class FPSCamera:
         xoff = rotated_x * self.sensitivity
         yoff = rotated_y * self.sensitivity
 
-        self.yaw += xoff
-        self.pitch += yoff
+        if self.use_reference_up:
+            prev_pitch = self.pitch
+            self.yaw += xoff
+            self.pitch = max(-89.0, min(89.0, self.pitch + yoff))
 
-        self.pitch = max(-89.0, min(89.0, self.pitch))
+            yaw_delta = np.radians(xoff)
+            pitch_delta = np.radians(self.pitch - prev_pitch)
 
+            yaw_q = _safe_quaternion(self.reference_up, yaw_delta)
+            self.orientation = quaternion.cross(yaw_q, self.orientation)
+
+            self.update_vectors()
+            pitch_axis = self.right
+            pitch_q = _safe_quaternion(pitch_axis, pitch_delta)
+            self.orientation = quaternion.cross(self.orientation, pitch_q)
+        else:
+            prev_pitch = self.pitch
+            self.yaw += xoff
+            self.pitch = max(-89.0, min(89.0, self.pitch + yoff))
+
+            yaw_q = _safe_quaternion(self.up, np.radians(xoff))
+            pitch_delta = np.radians(self.pitch - prev_pitch)
+            pitch_q = _safe_quaternion(self.right, pitch_delta)
+
+            self.orientation = quaternion.cross(self.orientation, yaw_q)
+            self.orientation = quaternion.cross(self.orientation, pitch_q)
+
+        self.orientation = quaternion.normalise(self.orientation)
         self.update_vectors()
 
     def process_roll(self, direction, dt):
-        if direction == "LEFT":
-            self.roll += self.roll_speed * dt
-        elif direction == "RIGHT":
-            self.roll -= self.roll_speed * dt
+        if self.use_reference_up:
+            return
 
-        self.roll = (self.roll + 360.0) % 360.0
+        delta = 0.0
+        if direction == "LEFT":
+            delta = self.roll_speed * dt
+        elif direction == "RIGHT":
+            delta = -self.roll_speed * dt
+
+        if abs(delta) < 1e-8:
+            return
+
+        self.roll = (self.roll + delta) % 360.0
+
+        roll_q = _safe_quaternion(self.front, np.radians(delta))
+        self.orientation = quaternion.normalise(quaternion.cross(self.orientation, roll_q))
         self.update_vectors()
 
     def process_movement(self, direction, dt):

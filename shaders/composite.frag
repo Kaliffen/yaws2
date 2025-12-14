@@ -62,6 +62,12 @@ float decodeViewDistance(vec2 uv) {
     return texture(gViewData, uv).x;
 }
 
+float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
 bool planetOccludes(vec3 dir) {
     float radius = max(planetRadius, atmosphereRadius);
     float b = dot(camPos, dir);
@@ -127,21 +133,30 @@ vec3 renderMoon(vec2 uv) {
     if (!projectDirection(moonDir, screenUV)) return vec3(0.0);
     if (planetOccludes(moonDir)) return vec3(0.0);
 
-    float radius = angularRadiusToScreen(radians(1.1));
+    float radius = angularRadiusToScreen(radians(1.4));
     vec2 toCenter = uv - screenUV;
     float dist = length(toCenter);
     if (dist >= radius) return vec3(0.0);
 
     vec3 normal = sphereNormal(normalize(moonDir), toCenter, radius);
-    float lambert = max(dot(normal, normalize(-sunDir)), 0.0);
-    float rim = smoothstep(1.0, 0.0, dist / max(radius, 1e-5));
-    float softness = pow(max(normal.z, 0.0), 0.65);
-    float phase = clamp(0.35 + 0.65 * dot(normalize(-sunDir), normalize(moonDir)), 0.0, 1.0);
+    vec3 lightDir = normalize(-sunDir);
+    float lambert = max(dot(normal, lightDir), 0.0);
+    float rim = pow(smoothstep(1.0, 0.0, dist / max(radius, 1e-5)), 1.35);
+    float softness = pow(max(normal.z, 0.0), 0.55);
+
+    float phase = clamp(0.4 + 0.55 * dot(lightDir, normalize(moonDir)), 0.05, 1.0);
+    float terminator = smoothstep(-0.25, 0.4, dot(normal, lightDir));
+
+    vec2 moonUV = vec2(atan(normal.x, normal.z) / (2.0 * 3.14159265) + 0.5, normal.y * 0.5 + 0.5);
+    float coarse = hash21(floor(moonUV * 22.0));
+    float fine = hash21(floor(moonUV * 64.0) + 13.7);
+    float craterMask = mix(coarse, fine, 0.45);
+    float detail = 0.5 + 0.45 * craterMask;
 
     vec3 albedo = vec3(0.74, 0.78, 0.84);
-    float brightness = (0.16 + lambert * 0.95) * rim * softness * phase;
-    float visibilityBoost = 0.08 * rim;
-    return albedo * moonPower * (brightness + visibilityBoost);
+    float brightness = (0.18 + lambert * 1.05) * rim * softness * phase * terminator;
+    float visibilityBoost = 0.12 * rim;
+    return albedo * detail * moonPower * (brightness + visibilityBoost);
 }
 
 void main() {

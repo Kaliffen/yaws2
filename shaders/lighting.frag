@@ -146,10 +146,11 @@ void main() {
     float moonHeight = dot(normalize(pos), moonLightDir);
 
     float sunIntensity = max(sunPower, 0.0);
+    float sunPresence = clamp(sunIntensity, 0.0, 1.0);
     vec3 sunColor = computeSunTint(pos, lightDir) * sunIntensity;
-    float sunVisibility = smoothstep(-0.02, 0.04, sunHeight);
+    float sunVisibility = smoothstep(-0.02, 0.04, sunHeight) * sunPresence;
     vec3 effectiveSunColor = sunColor * sunVisibility;
-    float twilight = smoothstep(-0.18, 0.04, sunHeight);
+    float twilight = smoothstep(-0.18, 0.04, sunHeight) * sunPresence;
     vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
     float ambientStrength = mix(0.02, 0.14, twilight);
 

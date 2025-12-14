@@ -93,3 +93,43 @@ def compute_sun_direction(day_fraction: float, year_fraction: float, tilt_degree
         sun_dir /= norm
 
     return sun_dir
+
+
+def compute_moon_direction(
+    total_days: float,
+    tilt_degrees: float,
+    lunar_cycle_days: float = 29.53,
+    inclination_degrees: float = 5.0,
+) -> np.ndarray:
+    """Compute a simple moon direction that orbits the planet over a lunar cycle.
+
+    The moon orbits once every ``lunar_cycle_days`` with a slight inclination from
+    the planet's equatorial plane. The planet tilt is applied so the moon matches
+    the world's axial orientation.
+    """
+
+    orbit_fraction = (total_days % lunar_cycle_days) / lunar_cycle_days
+    orbital_angle = 2.0 * np.pi * orbit_fraction
+
+    base_dir = np.array(
+        [np.cos(orbital_angle), 0.0, np.sin(orbital_angle)], dtype=np.float32
+    )
+
+    incl = np.deg2rad(inclination_degrees)
+    incl_matrix = np.array(
+        [[np.cos(incl), -np.sin(incl), 0.0], [np.sin(incl), np.cos(incl), 0.0], [0.0, 0.0, 1.0]],
+        dtype=np.float32,
+    )
+
+    tilt = np.deg2rad(tilt_degrees)
+    tilt_matrix = np.array(
+        [[1.0, 0.0, 0.0], [0.0, np.cos(tilt), -np.sin(tilt)], [0.0, np.sin(tilt), np.cos(tilt)]],
+        dtype=np.float32,
+    )
+
+    moon_dir = tilt_matrix @ (incl_matrix @ base_dir)
+    norm = np.linalg.norm(moon_dir)
+    if norm > 1e-6:
+        moon_dir /= norm
+
+    return moon_dir

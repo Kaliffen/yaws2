@@ -3,7 +3,7 @@ import numpy as np
 
 from gl_utils.buffers import create_color_fbo, create_gbuffer
 from rendering.constants import PlanetParameters
-from utils.time import compute_sun_direction
+from utils.time import compute_moon_direction, compute_sun_direction
 from rendering.uniforms import set_float, set_int, set_mat3, set_vec2, set_vec3
 
 
@@ -41,6 +41,8 @@ class PlanetRenderer:
         self.world_to_planet = np.identity(3, dtype=np.float32)
         self.time_seconds = 0.0
         self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
+        self.moon_direction = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+        self.moon_intensity = parameters.moon_power
 
     def _ensure_surface_info_buffer(self):
         if self.surface_info_buffer is not None:
@@ -79,6 +81,12 @@ class PlanetRenderer:
     def _update_sun_direction(self, day_fraction: float, year_fraction: float) -> None:
         self.sun_direction = compute_sun_direction(day_fraction, year_fraction, self.parameters.tilt_degrees)
 
+    def _update_moon_direction(self, day_index: int, day_fraction: float) -> None:
+        total_days = float(day_index) + float(day_fraction)
+        self.moon_direction = compute_moon_direction(total_days, self.parameters.tilt_degrees)
+        phase = 0.5 * (1.0 - float(np.dot(self.sun_direction, self.moon_direction)))
+        self.moon_intensity = max(self.parameters.moon_power * phase, 0.0)
+
     def _ensure_gbuffer(self, width, height):
         if self.gbuffer and self.gbuffer["width"] == width and self.gbuffer["height"] == height:
             return
@@ -105,6 +113,8 @@ class PlanetRenderer:
         set_vec3(program, "camUp", self.cam_up)
         set_vec3(program, "sunDir", self.sun_direction)
         set_float(program, "sunPower", self.parameters.sun_power)
+        set_vec3(program, "moonDir", self.moon_direction)
+        set_float(program, "moonPower", self.moon_intensity)
         set_float(program, "planetRadius", self.parameters.planet_radius)
         set_float(program, "atmosphereRadius", self.parameters.atmosphere_radius)
         set_float(program, "heightScale", self.parameters.height_scale)
@@ -132,10 +142,12 @@ class PlanetRenderer:
         self.time_seconds = calendar_state.elapsed_seconds
         self._update_rotation_matrices()
         self._update_sun_direction(calendar_state.day_fraction, calendar_state.year_fraction)
+        self._update_moon_direction(calendar_state.day_index, calendar_state.day_fraction)
 
     def update_parameters(self, parameters: PlanetParameters):
         self.parameters = parameters
         self.sun_direction = np.array(parameters.sun_direction, dtype=np.float32)
+        self.moon_intensity = parameters.moon_power
 
     def query_surface_info(self, query_pos, min_altitude_offset=0.0):
         if self.surface_info_program is None:
@@ -183,6 +195,7 @@ class PlanetRenderer:
         self.time_seconds = calendar_state.elapsed_seconds
         self._update_rotation_matrices()
         self._update_sun_direction(calendar_state.day_fraction, calendar_state.year_fraction)
+        self._update_moon_direction(calendar_state.day_index, calendar_state.day_fraction)
         self._ensure_gbuffer(width, height)
         self._ensure_color_targets(width, height)
 

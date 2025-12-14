@@ -15,6 +15,8 @@ uniform vec3 camRight;
 uniform vec3 camUp;
 uniform vec3 sunDir;
 uniform float sunPower;
+uniform vec3 moonDir;
+uniform float moonPower;
 uniform float planetRadius;
 uniform float cloudBaseAltitude;
 uniform float cloudLayerThickness;
@@ -200,6 +202,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
     vec3 lightDir = normalize(worldToPlanet * sunDir);
+    vec3 moonLightDir = normalize(worldToPlanet * moonDir);
 
     for (int i = 0; i < 256; i++) {
         if (i >= adaptiveSteps) break;
@@ -208,6 +211,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
         vec3 localNormal = normalize(samplePos);
         float sunHeight = dot(localNormal, lightDir);
+        float moonHeight = dot(localNormal, moonLightDir);
         float density = sampleCloudDensity(samplePos, coverageHint) * cloudDensity;
         density *= mix(1.0, 0.68, distanceLod);
 
@@ -226,8 +230,11 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
         float lightAmount = smoothstep(0.02, 0.18, sunHeight);
         float sunVisibility = smoothstep(-0.28, 0.05, sunHeight);
+        float moonVisibility = smoothstep(-0.32, 0.08, moonHeight);
         float forwardScatter = pow(max(dot(rayDir, lightDir), 0.0), cloudPhaseExponent);
+        float moonForwardScatter = pow(max(dot(rayDir, moonLightDir), 0.0), cloudPhaseExponent * 0.6);
         float phase = mix(0.38, 0.72, forwardScatter);
+        float moonPhase = mix(0.22, 0.48, moonForwardScatter);
         float lowLightAtten = mix(0.4, 1.0, sunVisibility);
         float diffuseDimming = mix(0.55, 1.0, lightAmount);
         float twilightMask = smoothstep(-0.25, 0.05, sunHeight) * (1.0 - lightAmount);
@@ -237,13 +244,17 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
 
         float sunIntensity = max(sunPower, 0.0);
         vec3 sunColor = computeSunTint(localNormal, lightDir) * sunIntensity;
+        float moonIntensity = max(moonPower, 0.0);
+        vec3 moonColor = vec3(0.60, 0.66, 0.78) * moonIntensity * moonVisibility;
         vec3 directLight = cloudLightColor * sunColor * lightAmount * mix(0.4, 0.82, phase) * sunVisibility * lowLightAtten;
+        vec3 moonLight = moonColor * mix(0.22, 0.5, moonPhase) * moonVisibility;
         directLight *= mix(0.55, 1.0, lightAmount + sunVisibility * 0.35) * horizonLightDimming;
         vec3 ambient = mix(vec3(0.02, 0.025, 0.03), vec3(0.08, 0.10, 0.12), sunVisibility) * lowLightAtten;
         ambient *= mix(0.5, 1.0, lightAmount + sunVisibility * 0.5);
         vec3 warmTwilight = vec3(0.12, 0.09, 0.10) * twilightMask * sunIntensity * 0.18 * lowLightAtten;
 
         vec3 scatter = (directLight + ambient * cloudLightColor + warmTwilight) * density * stepSize * diffuseDimming * twilightDimming;
+        scatter += moonLight * density * stepSize * mix(0.65, 1.0, moonVisibility) * mix(0.45, 1.0, phase);
 
         accum += scatter * transmittance;
         transmittance *= exp(-extinction);

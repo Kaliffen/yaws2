@@ -293,16 +293,7 @@ void main() {
         posPlanet = ro + rd * marchEnd;
     }
 
-    float cloudMask = 0.0;
-
-    // Only accumulate cloud noise when the view ray actually passes through the
-    // atmosphere (or hits the surface). Otherwise distant space renders pick up
-    // stray gray cloud patterns.
     bool throughAtmosphere = hit || (hitsAtmosphere && tAtm1 > 0.0);
-    if (throughAtmosphere) {
-        vec3 coverageSample = hit ? posPlanet : (ro + rd * min(maxRayDistance, max(tAtm1, 0.0)));
-        cloudMask = cloudCoverageField(normalize(coverageSample));
-    }
 
     vec3 posWorld = planetToWorld * posPlanet;
     vec3 normal = normalize(planetToWorld * normalPlanet);
@@ -326,6 +317,6 @@ void main() {
 
     gPositionHeight = vec4(posWorld, heightValue);
     gNormalFlags = vec4(normal, waterFlag);
-    gMaterial = vec4(baseColor, cloudMask);
+    gMaterial = vec4(baseColor, 1.0);
     gViewData = vec4(viewDistance, atmEntry, atmExit, waterPath);
 }

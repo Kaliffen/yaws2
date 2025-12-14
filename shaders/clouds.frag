@@ -235,7 +235,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         float moonForwardScatter = pow(max(dot(rayDir, moonLightDir), 0.0), cloudPhaseExponent * 0.6);
         float phase = mix(0.38, 0.72, forwardScatter);
         float moonPhase = mix(0.22, 0.48, moonForwardScatter);
-        float lowLightAtten = mix(0.6, 1.0, sunVisibility);
+        float lowLightAtten = 1.0; //mix(1.0, 1.0, sunVisibility);
         float diffuseDimming = mix(0.55, 1.0, lightAmount);
         float twilightMask = smoothstep(-0.25, 0.05, sunHeight) * (1.0 - lightAmount);
         float twilightDimming = mix(0.6, 1.0, 1.0 - twilightMask * 0.7);

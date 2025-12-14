@@ -5,7 +5,7 @@ import numpy as np
 # Default baseline values used to seed configurable parameters.
 SUN_DIRECTION = np.array([0.22, 0.22, 0.71], dtype=np.float32)
 SUN_POWER = 1.5
-MOON_POWER = 0.2
+MOON_POWER = 0.5
 MOON_REFLECT_POWER = 1.0
 SCALAR = 1.0
 # Base scale values for the planet and atmosphere (kilometers)

@@ -5,7 +5,6 @@ out vec4 FragColor;
 in vec2 TexCoord;
 
 uniform sampler2D gPositionHeight;
-uniform sampler2D gNormalFlags;
 uniform sampler2D gViewData;
 
 uniform vec3 camPos;
@@ -23,10 +22,6 @@ uniform mat3 worldToPlanet;
 
 vec3 decodePosition(vec2 uv) {
     return texture(gPositionHeight, uv).xyz;
-}
-
-vec4 decodeNormalFlags(vec2 uv) {
-    return texture(gNormalFlags, uv);
 }
 
 vec3 decodeViewData(vec2 uv) {
@@ -64,30 +59,30 @@ vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     return mix(base, twilightColor, goldenBand * 0.18);
 }
 
-vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface, vec2 segment) {
+vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec2 segment, vec3 sunDirPlanet, vec3 moonDirPlanet) {
     float pathLength = segment.y - segment.x;
     float viewHeight = max(length(rayOrigin) - planetRadius, 0.0);
     float atmThickness = max(atmosphereRadius - planetRadius, 0.001);
     float altitudeNorm = clamp(viewHeight / atmThickness, 0.0, 1.0);
     float altitudeFalloff = mix(1.0, 0.25, altitudeNorm * altitudeNorm);
 
-    vec3 lightDir = normalize(worldToPlanet * sunDir);
-    float sunFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), lightDir);
+    vec3 entryDir = normalize(rayOrigin + rayDir * max(segment.x, 0.0));
+    float sunFacing = dot(entryDir, sunDirPlanet);
     float sunVisibility = smoothstep(-0.08, 0.12, sunFacing);
-    vec3 moonDirLocal = normalize(worldToPlanet * moonDir);
-    float moonFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), moonDirLocal);
+    float moonFacing = dot(entryDir, moonDirPlanet);
     float moonVisibility = smoothstep(-0.18, 0.04, moonFacing);
 
     // Remove contributions when the body is behind the planet from the camera's
     // point of view.
-    if (planetOccludes(rayOrigin, lightDir)) {
+    if (planetOccludes(rayOrigin, sunDirPlanet)) {
         sunVisibility = 0.0;
     }
-    if (planetOccludes(rayOrigin, moonDirLocal)) {
+    if (planetOccludes(rayOrigin, moonDirPlanet)) {
         moonVisibility = 0.0;
     }
 
-    float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
+    vec3 viewUp = normalize(rayOrigin);
+    float horizonDot = clamp(dot(rayDir, viewUp), -1.0, 1.0);
 
     // The previous approach weighted the scattering almost entirely toward the
     // horizon, which made rays that travel up through the atmosphere (toward
@@ -104,7 +99,7 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
         * (1.0 - smoothstep(0.02 * atmThickness, 0.18 * atmThickness, pathLength));
     float scatterSpread = max(horizonFactor + zenithLift * 0.6, zenithLift);
     scatterSpread = max(scatterSpread, thinPathLift);
-    float mieForward = pow(max(dot(rayDir, lightDir), 0.0), 4.0) * sunVisibility;
+    float mieForward = pow(max(dot(rayDir, sunDirPlanet), 0.0), 4.0) * sunVisibility;
 
     float pathFactor = smoothstep(0.0, atmThickness, pathLength);
     float density = (0.32 + 0.55 * (1.0 - altitudeNorm)) * max(pathFactor, 0.12);
@@ -112,7 +107,7 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     float scatter = scatterSpread * altitudeFalloff * density * sunVisibility * 1.12;
     scatter += mieForward * 0.06;
 
-    vec3 sunTint = computeSunTint(normalize(rayOrigin), lightDir);
+    vec3 sunTint = computeSunTint(viewUp, sunDirPlanet);
     float twilightBlend = smoothstep(-0.32, 0.06, sunFacing) * (1.0 - sunVisibility);
     vec3 twilightTint = mix(vec3(0.16, 0.18, 0.30), vec3(0.30, 0.24, 0.46), twilightBlend);
     vec3 horizonTint = mix(sunTint, twilightTint, clamp(1.0 - sunVisibility, 0.0, 1.0));
@@ -122,7 +117,7 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     vec3 sunScatter = atmosphereColor * scatter * sunIntensity;
 
     float moonIntensity = max(moonPower, 0.0);
-    float moonForward = pow(max(dot(rayDir, moonDirLocal), 0.0), 3.0) * moonVisibility;
+    float moonForward = pow(max(dot(rayDir, moonDirPlanet), 0.0), 3.0) * moonVisibility;
     float moonScatter = scatterSpread * altitudeFalloff * density * moonVisibility * 0.35;
     moonScatter += moonForward * 0.04;
     vec3 moonTint = vec3(0.46, 0.52, 0.64) * moonIntensity;
@@ -134,17 +129,17 @@ void main() {
     vec2 uv = TexCoord;
 
     vec3 pos = decodePosition(uv);
-    vec4 normalFlags = decodeNormalFlags(uv);
-    bool hit = normalFlags.w > -0.5;
     vec3 viewData = decodeViewData(uv);
 
     vec3 camPlanet = worldToPlanet * camPos;
     vec3 posPlanet = worldToPlanet * pos;
     vec3 viewDirWorld = normalize(pos - camPos);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
+    vec3 sunDirPlanet = normalize(worldToPlanet * sunDir);
+    vec3 moonDirPlanet = normalize(worldToPlanet * moonDir);
     vec2 atmosphereSegment = viewData.yz;
     vec3 atmosphere = (atmosphereSegment.y > atmosphereSegment.x)
-        ? computeAtmosphere(camPlanet, viewDirPlanet, posPlanet, hit, atmosphereSegment)
+        ? computeAtmosphere(camPlanet, viewDirPlanet, atmosphereSegment, sunDirPlanet, moonDirPlanet)
         : vec3(0.0);
 
     float opticalDepth = length(atmosphere);

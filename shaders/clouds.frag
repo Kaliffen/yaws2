@@ -131,9 +131,8 @@ float cloudShapeNoise(vec3 p) {
     return base * 0.45 + billow * 0.4 + detail * 0.25;
 }
 
-float sampleCloudDensity(vec3 p, float coverageHint) {
-    float layerBaseRadius = planetRadius + cloudBaseAltitude;
-    float heightNorm = clamp((length(p) - layerBaseRadius) / max(cloudLayerThickness, 0.001), 0.0, 1.0);
+float sampleCloudDensity(vec3 p, float coverageHint, float layerBaseRadius, float invLayerThickness) {
+    float heightNorm = clamp((length(p) - layerBaseRadius) * invLayerThickness, 0.0, 1.0);
 
     float coverage = cloudCoverageField(normalize(p));
     coverage = mix(coverage, coverageHint, 0.35);
@@ -169,8 +168,18 @@ float computeDistanceLod(float surfaceDistance) {
     return clamp(normalized * 0.55, 0.0, 1.0);
 }
 
-vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float coverageHint, float distanceLod, float jitter) {
+vec4 raymarchClouds(
+    vec3 rayOrigin,
+    vec3 rayDir,
+    float maxDistance,
+    float coverageHint,
+    float distanceLod,
+    float jitter,
+    vec3 sunDirPlanet,
+    vec3 moonDirPlanet
+) {
     float baseRadius = planetRadius + cloudBaseAltitude;
+    float invLayerThickness = 1.0 / max(cloudLayerThickness, 0.001);
     float topRadius = baseRadius + cloudLayerThickness;
 
     float tOuter0, tOuter1;
@@ -201,8 +210,8 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
     float jitterOffset = jitter - 0.5;
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
-    vec3 lightDir = normalize(worldToPlanet * sunDir);
-    vec3 moonLightDir = normalize(worldToPlanet * moonDir);
+    vec3 lightDir = sunDirPlanet;
+    vec3 moonLightDir = moonDirPlanet;
 
     for (int i = 0; i < 256; i++) {
         if (i >= adaptiveSteps) break;
@@ -212,7 +221,7 @@ vec4 raymarchClouds(vec3 rayOrigin, vec3 rayDir, float maxDistance, float covera
         vec3 localNormal = normalize(samplePos);
         float sunHeight = dot(localNormal, lightDir);
         float moonHeight = dot(localNormal, moonLightDir);
-        float density = sampleCloudDensity(samplePos, coverageHint) * cloudDensity;
+        float density = sampleCloudDensity(samplePos, coverageHint, baseRadius, invLayerThickness) * cloudDensity;
         density *= mix(1.0, 0.68, distanceLod);
 
         // Thin clouds along grazing angles so the horizon view doesn't look overly
@@ -279,6 +288,8 @@ void main() {
     vec3 camPlanet = worldToPlanet * camPos;
     vec3 viewDirWorld = hit ? normalize(pos - camPos) : rayDirection(uv);
     vec3 viewDirPlanet = normalize(worldToPlanet * viewDirWorld);
+    vec3 sunDirPlanet = normalize(worldToPlanet * sunDir);
+    vec3 moonDirPlanet = normalize(worldToPlanet * moonDir);
     float surfaceDistance = viewData.x;
     float distanceLod = computeDistanceLod(surfaceDistance);
     float jitter = interleavedGradientNoise(gl_FragCoord.xy + timeSeconds);
@@ -289,7 +300,17 @@ void main() {
     }
 
     float distanceFade = 1.0 - smoothstep(cloudDrawDistance * 0.7, cloudDrawDistance, surfaceDistance);
-    vec4 clouds = raymarchClouds(camPlanet, viewDirPlanet, cappedDistance, material.a, distanceLod, jitter);
+    float coverageHint = clamp(material.a, 0.0, 1.0);
+    vec4 clouds = raymarchClouds(
+        camPlanet,
+        viewDirPlanet,
+        cappedDistance,
+        coverageHint,
+        distanceLod,
+        jitter,
+        sunDirPlanet,
+        moonDirPlanet
+    );
     clouds.rgb *= distanceFade;
     clouds.a = mix(1.0, clouds.a, distanceFade);
 

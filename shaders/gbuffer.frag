@@ -2,7 +2,7 @@
 
 layout (location = 0) out vec4 gPositionHeight;   // xyz = world position of first hit, w = terrain height
 layout (location = 1) out vec4 gNormalFlags;      // xyz = normal, w = water coverage (1 water, 0 land, -1 no hit)
-layout (location = 2) out vec4 gMaterial;         // rgb = albedo, a = cloud density placeholder
+layout (location = 2) out vec4 gMaterial;         // rgb = albedo, a = precomputed cloud coverage
 layout (location = 3) out vec4 gViewData;         // x = view distance, y = atmosphere entry, z = atmosphere exit, w = water path length
 
 // Camera + Lighting
@@ -315,8 +315,10 @@ void main() {
         atmExit = min(tAtm1, maxRayDistance);
     }
 
+    float coverageHint = cloudCoverageField(normalize(posPlanet));
+
     gPositionHeight = vec4(posWorld, heightValue);
     gNormalFlags = vec4(normal, waterFlag);
-    gMaterial = vec4(baseColor, 1.0);
+    gMaterial = vec4(baseColor, coverageHint);
     gViewData = vec4(viewDistance, atmEntry, atmExit, waterPath);
 }

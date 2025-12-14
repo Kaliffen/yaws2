@@ -33,6 +33,16 @@ vec3 decodeViewData(vec2 uv) {
     return texture(gViewData, uv).xyz;
 }
 
+bool planetOccludes(vec3 camPlanet, vec3 dir) {
+    float radius = max(planetRadius, atmosphereRadius);
+    float b = dot(camPlanet, dir);
+    float c = dot(camPlanet, camPlanet) - radius * radius;
+    float h = b * b - c;
+    if (h < 0.0) return false;
+    float t = -b - sqrt(h);
+    return t > 0.0;
+}
+
 vec3 computeSunTint(vec3 upDir, vec3 lightDir) {
     float sunHeight = clamp(dot(upDir, lightDir), -1.0, 1.0);
 
@@ -63,6 +73,15 @@ vec3 computeAtmosphere(vec3 rayOrigin, vec3 rayDir, vec3 hitPos, bool hitSurface
     vec3 moonDirLocal = normalize(worldToPlanet * moonDir);
     float moonFacing = dot(normalize(rayOrigin + rayDir * max(segment.x, 0.0)), moonDirLocal);
     float moonVisibility = smoothstep(-0.18, 0.04, moonFacing);
+
+    // Remove contributions when the body is behind the planet from the camera's
+    // point of view.
+    if (planetOccludes(rayOrigin, lightDir)) {
+        sunVisibility = 0.0;
+    }
+    if (planetOccludes(rayOrigin, moonDirLocal)) {
+        moonVisibility = 0.0;
+    }
 
     float horizonDot = clamp(dot(rayDir, normalize(rayOrigin)), -1.0, 1.0);
 

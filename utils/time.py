@@ -128,9 +128,12 @@ def compute_moon_direction(
     """
 
     orbit_fraction = (total_days % lunar_cycle_days) / lunar_cycle_days
-    orbital_angle = 2.0 * np.pi * orbit_fraction + np.pi
+    orbital_angle = 2.0 * np.pi * orbit_fraction
 
-    base_dir = np.array(sun_direction, dtype=np.float32)
+    # Start from the anti-sun direction so the lit hemisphere of the moon
+    # naturally targets the night side of the planet, then let the orbit progress
+    # around the up axis to create phase offsets through the month.
+    base_dir = -np.array(sun_direction, dtype=np.float32)
     if np.linalg.norm(base_dir) < 1e-6:
         base_dir = np.array([0.0, 1.0, 0.0], dtype=np.float32)
     else:

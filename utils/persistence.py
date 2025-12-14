@@ -17,24 +17,20 @@ def load_camera_bookmark(path: Path = BOOKMARK_PATH) -> Optional[dict]:
     except (OSError, json.JSONDecodeError):
         return None
 
-    required_keys = {"position", "yaw", "pitch", "roll", "fov"}
+    required_keys = {"position", "rotation", "fov"}
     if not required_keys.issubset(data):
         return None
 
     try:
         position = np.array(data["position"], dtype=np.float32)
-        yaw = float(data["yaw"])
-        pitch = float(data["pitch"])
-        roll = float(data["roll"])
+        rotation = np.array(data["rotation"], dtype=np.float32)
         fov = float(data["fov"])
     except (TypeError, ValueError):
         return None
 
     return {
         "position": position,
-        "yaw": yaw,
-        "pitch": pitch,
-        "roll": roll,
+        "rotation": rotation,
         "fov": fov,
     }
 
@@ -42,9 +38,7 @@ def load_camera_bookmark(path: Path = BOOKMARK_PATH) -> Optional[dict]:
 def save_camera_bookmark(camera, path: Path = BOOKMARK_PATH) -> bool:
     payload = {
         "position": [float(v) for v in camera.position.tolist()],
-        "yaw": float(camera.yaw),
-        "pitch": float(camera.pitch),
-        "roll": float(camera.roll),
+        "rotation": [float(v) for v in camera.rotation.tolist()],
         "fov": float(camera.fov_degrees),
     }
 

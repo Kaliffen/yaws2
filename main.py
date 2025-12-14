@@ -3,10 +3,11 @@ from OpenGL.GL import *
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
 import numpy as np
+from pyrr import Quaternion
 
 from gl_utils.program import create_compute_program, create_program
 from gl_utils.buffers import create_fullscreen_quad
-from gl_utils.camera import FPSCamera, normalize, WORLD_UP
+from gl_utils.camera import QuaternionCamera
 from rendering.constants import PlanetParameters, default_planet_parameters, SCALAR
 from rendering.planet_renderer import PlanetRenderer
 from utils.time import DeltaTimer, PlanetCalendar
@@ -18,12 +19,6 @@ def compute_adaptive_speed(position, base_speed, planet_radius):
     distance_ratio = distance / planet_radius
     adaptive_factor = np.clip(0.15 + distance_ratio * 0.85, 0.15, 4.0)
     return base_speed * adaptive_factor
-
-
-
-
-def project_to_plane(vector, normal):
-    return vector - normal * np.dot(vector, normal)
 
 
 def apply_raymarch_preset(editing_params: PlanetParameters, preset: str):
@@ -173,9 +168,6 @@ def draw_performance_panel(
     calendar_state,
     days_in_year: int,
     hours_per_day: int,
-    gravity_enabled: bool,
-    player_height: float,
-    min_ground_clearance: float,
     camera_fov_degrees: float,
     calendar_edit_state: dict,
     bookmark_available: bool,
@@ -274,24 +266,12 @@ def draw_performance_panel(
     )
 
     imgui.separator()
-    imgui.text("Player")
-    imgui.text(f"Height above terrain: {player_height:.2f} m")
-    imgui.same_line()
-    imgui.text_disabled("(read-only)")
-    _, min_ground_clearance = imgui.input_float(
-        "Min ground clearance (m)", min_ground_clearance, step=0.01, step_fast=0.1
-    )
     _, camera_fov_degrees = imgui.slider_float(
         "Camera FOV (deg)", camera_fov_degrees, 35.0, 120.0
     )
-    gravity_clicked = imgui.button("Gravity (G)", width=140)
-    imgui.same_line()
-    imgui.text("On" if gravity_enabled else "Off")
 
     imgui.end()
     return (
-        gravity_clicked,
-        max(min_ground_clearance, 0.0),
         camera_fov_degrees,
         set_clock_clicked,
         sync_clock_clicked,
@@ -351,27 +331,23 @@ def main():
     parameters = default_planet_parameters()
     editing_params = parameters.copy()
 
-    camera = FPSCamera(
-        position=np.array([0.0, 0.0, parameters.planet_radius * 1.6], dtype=np.float32),
-        yaw=-90.0,
-        pitch=0.0
+    camera = QuaternionCamera(
+        position=(0.0, 0.0, parameters.planet_radius * 1.6),
+        size=(width, height),
+        fovy=70.0,
     )
     # Start with a modest base speed so surface traversal feels grounded. Speed
     # ramps up automatically as you get farther from the planet.
     base_speed = 60.0 * SCALAR
     camera.speed = base_speed
-    camera.min_radius = None
-    camera.enable_reference_alignment(False)
 
     bookmark_loaded = False
     bookmark = load_camera_bookmark()
     if bookmark is not None:
         camera.position = bookmark["position"].astype(np.float32)
-        camera.yaw = bookmark["yaw"]
-        camera.pitch = bookmark["pitch"]
-        camera.roll = bookmark["roll"]
+        camera.rotation = Quaternion(bookmark["rotation"])
         camera.fov_degrees = bookmark["fov"]
-        camera.update_vectors()
+        camera.update_camera_vectors()
         bookmark_loaded = True
 
     renderer = PlanetRenderer(
@@ -398,10 +374,6 @@ def main():
 
     camera_mode = True
     space_pressed = False
-    gravity_enabled = False
-    g_pressed = False
-    gravity_acceleration = 35.0
-    min_ground_clearance = 0.0
 
     last_mouse_x, last_mouse_y = width / 2, height / 2
     first_mouse = True
@@ -411,9 +383,6 @@ def main():
     imgui.create_context()
     imgui_renderer = GlfwRenderer(window)
 
-    prev_planet_to_world = renderer.planet_to_world.copy()
-    prev_world_to_planet = renderer.world_to_planet.copy()
-
     while not glfw.window_should_close(window):
         dt = timer.get_delta()
         calendar_state = calendar.advance(dt, editing_params.time_speed)
@@ -421,29 +390,11 @@ def main():
         current_sun_direction = renderer.sun_direction
         current_moon_direction = renderer.moon_direction
         current_moon_intensity = renderer.moon_intensity
-        spin_delta = renderer.planet_to_world @ prev_world_to_planet
         glfw.poll_events()
         imgui_renderer.process_inputs()
         imgui.new_frame()
 
         io = imgui.get_io()
-
-        surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
-        in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
-        if gravity_enabled and in_atmosphere:
-            camera.position = spin_delta @ camera.position
-            camera.velocity = spin_delta @ camera.velocity
-            surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
-
-        if gravity_enabled and in_atmosphere:
-            camera.enable_reference_alignment(True)
-            if surface_info is not None:
-                camera.set_reference_up(surface_info["normal"])
-            else:
-                camera.set_reference_up(WORLD_UP)
-        else:
-            camera.enable_reference_alignment(False)
-        camera.update_vectors()
 
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
@@ -460,17 +411,6 @@ def main():
             first_mouse = True
         space_pressed = space_down
 
-        g_down = glfw.get_key(window, glfw.KEY_G) == glfw.PRESS
-        if g_down and not g_pressed:
-            gravity_enabled = not gravity_enabled
-            if gravity_enabled and in_atmosphere and surface_info is not None:
-                camera.enable_reference_alignment(True)
-                camera.set_reference_up(surface_info["normal"])
-            else:
-                camera.enable_reference_alignment(False)
-            camera.update_vectors()
-        g_pressed = g_down
-
         # Mouse look when in camera mode
         mx, my = glfw.get_cursor_pos(window)
         if first_mouse:
@@ -482,50 +422,25 @@ def main():
         last_mouse_x, last_mouse_y = mx, my
 
         if camera_mode and not io.want_capture_mouse:
-            camera.process_mouse(xoff, yoff)
+            camera.rotate(xoff, yoff)
 
         # Keyboard
         shift_pressed = glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
-        speed_multiplier = 10.0 if shift_pressed else 1.0
-        camera.speed = compute_adaptive_speed(camera.position, base_speed, parameters.planet_radius) * speed_multiplier
+        camera.speed = compute_adaptive_speed(camera.position, base_speed, parameters.planet_radius)
 
         if not io.want_capture_keyboard:
-            if gravity_enabled and in_atmosphere and surface_info is not None:
-                surface_normal = surface_info["normal"]
-                tangent_forward = project_to_plane(camera.front, surface_normal)
-                if np.linalg.norm(tangent_forward) < 1e-5:
-                    tangent_forward = project_to_plane(camera.right, surface_normal)
-                tangent_forward = normalize(tangent_forward)
-                tangent_right = normalize(np.cross(tangent_forward, surface_normal))
-
-                move_dir = np.zeros(3, dtype=np.float32)
-                if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
-                    move_dir += tangent_forward
-                if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
-                    move_dir -= tangent_forward
-                if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
-                    move_dir -= tangent_right
-                if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
-                    move_dir += tangent_right
-
-                move_len = np.linalg.norm(move_dir)
-                if move_len > 1e-6:
-                    move_dir = move_dir / move_len
-                    camera.position += move_dir * camera.speed * dt
-            else:
-                if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
-                    camera.process_movement("FORWARD", dt)
-                if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
-                    camera.process_movement("BACKWARD", dt)
-                if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
-                    camera.process_movement("LEFT", dt)
-                if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
-                    camera.process_movement("RIGHT", dt)
-                if not gravity_enabled:
-                    if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
-                        camera.process_roll("LEFT", dt)
-                    if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:
-                        camera.process_roll("RIGHT", dt)
+            if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
+                camera.move("FORWARD", dt, boost=shift_pressed)
+            if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
+                camera.move("BACKWARD", dt, boost=shift_pressed)
+            if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
+                camera.move("LEFT", dt, boost=shift_pressed)
+            if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
+                camera.move("RIGHT", dt, boost=shift_pressed)
+            if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
+                camera.adjust_roll(90.0 * dt)
+            if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:
+                camera.adjust_roll(-90.0 * dt)
 
             for idx, key in enumerate([
                 glfw.KEY_1,
@@ -543,37 +458,10 @@ def main():
                     debug_level = idx + 1
                 pressed_state[idx] = is_pressed
 
-        if gravity_enabled and in_atmosphere and surface_info is not None:
-            camera.velocity += (-surface_info["normal"] * gravity_acceleration) * dt
-            camera.position += camera.velocity * dt
-        else:
-            camera.velocity[...] = 0.0
-
-        surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
-        if surface_info is not None and surface_info["altitude"] < min_ground_clearance:
-            camera.position = surface_info["normal"] * surface_info["clamped_radius"]
-            if gravity_enabled:
-                radial_component = np.dot(camera.velocity, surface_info["normal"])
-                camera.velocity -= radial_component * surface_info["normal"]
-
-        player_height = max(surface_info["altitude"], 0.0) if surface_info is not None else 0.0
-        in_atmosphere = np.linalg.norm(camera.position) <= parameters.atmosphere_radius
-        if gravity_enabled and in_atmosphere:
-            camera.enable_reference_alignment(True)
-            if surface_info is not None:
-                camera.set_reference_up(surface_info["normal"])
-            else:
-                camera.set_reference_up(WORLD_UP)
-        else:
-            camera.enable_reference_alignment(False)
-        camera.update_vectors()
-
         framebuffer_width, framebuffer_height = glfw.get_framebuffer_size(window)
         width, height = framebuffer_width or width, framebuffer_height or height
 
         (
-            gravity_clicked,
-            min_ground_clearance,
             camera_fov,
             set_clock_clicked,
             sync_clock_clicked,
@@ -583,9 +471,6 @@ def main():
             calendar_state,
             calendar.days_in_year,
             calendar.hours_per_day,
-            gravity_enabled,
-            player_height,
-            min_ground_clearance,
             camera.fov_degrees,
             calendar_edit_state,
             bookmark_loaded,
@@ -622,14 +507,6 @@ def main():
             )
         if save_bookmark_clicked:
             bookmark_loaded = save_camera_bookmark(camera) or bookmark_loaded
-        if gravity_clicked:
-            gravity_enabled = not gravity_enabled
-            if gravity_enabled and in_atmosphere and surface_info is not None:
-                camera.enable_reference_alignment(True)
-                camera.set_reference_up(surface_info["normal"])
-            else:
-                camera.enable_reference_alignment(False)
-            camera.update_vectors()
         update_clicked, reset_clicked = draw_parameter_panel(
             editing_params,
             current_sun_direction,
@@ -640,9 +517,6 @@ def main():
         if update_clicked:
             parameters = editing_params.copy()
             renderer.update_parameters(parameters)
-            surface_info = renderer.query_surface_info(camera.position, min_ground_clearance)
-            if surface_info is not None and surface_info["altitude"] < min_ground_clearance:
-                camera.position = surface_info["normal"] * surface_info["clamped_radius"]
             editing_params = parameters.copy()
         elif reset_clicked:
             editing_params = parameters.copy()
@@ -667,9 +541,6 @@ def main():
         imgui_renderer.render(imgui.get_draw_data())
 
         glfw.swap_buffers(window)
-
-        prev_planet_to_world = renderer.planet_to_world.copy()
-        prev_world_to_planet = renderer.world_to_planet.copy()
 
     glfw.terminate()
 

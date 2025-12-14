@@ -148,11 +148,13 @@ void main() {
     float sunIntensity = max(sunPower, 0.0);
     float sunPresence = clamp(sunIntensity, 0.0, 1.0);
     vec3 sunColor = computeSunTint(pos, lightDir) * sunIntensity;
-    float sunVisibility = smoothstep(-0.02, 0.04, sunHeight) * sunPresence;
+    // Keep the sun contributing longer near the horizon so scenes do not
+    // prematurely fall into darkness while the star is still visible.
+    float sunVisibility = smoothstep(-0.08, 0.10, sunHeight) * sunPresence;
     vec3 effectiveSunColor = sunColor * sunVisibility;
-    float twilight = smoothstep(-0.18, 0.04, sunHeight) * sunPresence;
-    vec3 ambientLight = mix(vec3(0.02, 0.04, 0.06), vec3(0.16, 0.22, 0.32), twilight);
-    float ambientStrength = mix(0.02, 0.14, twilight);
+    float twilight = smoothstep(-0.30, 0.08, sunHeight) * sunPresence;
+    vec3 ambientLight = mix(vec3(0.03, 0.05, 0.08), vec3(0.20, 0.26, 0.36), twilight);
+    float ambientStrength = mix(0.06, 0.20, twilight);
 
     float moonIntensity = max(moonPower, 0.0);
     float moonVisibility = smoothstep(-0.26, 0.02, moonHeight);

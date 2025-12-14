@@ -69,13 +69,18 @@ float hash21(vec2 p) {
 }
 
 bool planetOccludes(vec3 dir) {
-    float radius = max(planetRadius, atmosphereRadius);
+    // Use the solid planet radius so the body, not its atmosphere shell,
+    // determines occlusion. Consider both intersections so the test works even
+    // when the camera is inside the atmosphere: if the far root is ahead of the
+    // camera, the planet blocks the light.
     float b = dot(camPos, dir);
-    float c = dot(camPos, camPos) - radius * radius;
+    float c = dot(camPos, camPos) - planetRadius * planetRadius;
     float h = b * b - c;
     if (h < 0.0) return false;
-    float t = -b - sqrt(h);
-    return t > 0.0;
+    float sqrtH = sqrt(h);
+    float tNear = -b - sqrtH;
+    float tFar = -b + sqrtH;
+    return tFar > 0.0 && (tNear > 0.0 || length(camPos) <= planetRadius);
 }
 
 bool projectDirection(vec3 dir, out vec2 screenUV) {

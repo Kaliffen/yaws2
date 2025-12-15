@@ -38,6 +38,7 @@ uniform float cloudCoverage;
 // Terrain generation constants and helpers
 const float PLANET_SEED = 1222.0;
 const float VERTICAL_EXAGGERATION = 6.0; // 4–8 is realistic
+const float BASE_HEIGHT_SCALE = 60.0;   // matches the CPU default
 const float CONTINENT_GAIN = 0.48;
 const float HILLS_GAIN = 0.32;
 const float MOUNTAIN_GAIN = 4.2;
@@ -138,7 +139,12 @@ float terrainHeight(vec3 p) {
 
     float compressedHeight = height / (1.0 + abs(height) / 7.0);
 
-    return compressedHeight * VERTICAL_EXAGGERATION;
+    // Keep the shader terrain displacement in sync with the CPU's configurable
+    // height scale so raymarch bounds and the actual surface agree. The base
+    // height scale matches the CPU default, so the factor is 1.0 unless the
+    // user changes the slider.
+    float heightScaleFactor = heightScale / BASE_HEIGHT_SCALE;
+    return compressedHeight * VERTICAL_EXAGGERATION * heightScaleFactor;
 }
 
 float planetSDF(vec3 p) {

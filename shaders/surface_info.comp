@@ -16,6 +16,7 @@ layout(std430, binding = 0) buffer SurfaceInfo {
 
 const float PLANET_SEED = 1222.0;
 const float VERTICAL_EXAGGERATION = 6.0;
+const float BASE_HEIGHT_SCALE = 60.0;
 const float CONTINENT_GAIN = 0.48;
 const float HILLS_GAIN = 0.32;
 const float MOUNTAIN_GAIN = 4.2;
@@ -101,7 +102,8 @@ float terrainHeight(vec3 p) {
 
     float compressedHeight = height / (1.0 + abs(height) / 7.0);
 
-    return compressedHeight * VERTICAL_EXAGGERATION;
+    float heightScaleFactor = heightScale / BASE_HEIGHT_SCALE;
+    return compressedHeight * VERTICAL_EXAGGERATION * heightScaleFactor;
 }
 
 void main() {

@@ -27,9 +27,10 @@ CLOUD_LAYER_THICKNESS_RATIO = CLOUD_LAYER_THICKNESS_PERCENT / 100.0
 
 ATMOSPHERE_RADIUS = PLANET_RADIUS * (1.0 + ATMOSPHERE_THICKNESS_RATIO)
 
-# Keep terrain displacement realistic relative to the planet scale to avoid
-# exaggerated features, but still allow visible mountain ranges.
-HEIGHT_SCALE = 432.2 * SCALAR
+# Keep terrain displacement realistic relative to the planet scale while
+# matching the new, more detailed height field used by the shaders. Heights are
+# expressed in kilometers and tuned for Earth-like scales.
+HEIGHT_SCALE = 60.0 * SCALAR
 
 # Water parameters
 # Interpret sea level as a world-space height offset instead of a fractional

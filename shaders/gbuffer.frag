@@ -35,9 +35,18 @@ uniform float timeSeconds;
 uniform vec3 waterColor;
 uniform float cloudCoverage;
 
-// Helpers
+// Terrain generation constants and helpers
+const float PLANET_SEED = 1222.0;
+const float VERTICAL_EXAGGERATION = 6.0; // 4–8 is realistic
+const float CONTINENT_GAIN = 0.48;
+const float HILLS_GAIN = 0.32;
+const float MOUNTAIN_GAIN = 4.2;
+const float PEAK_GAIN = 7.2;
+const float OCEAN_DEPTH = 3.8;
+
 float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1));
+    p += PLANET_SEED;
+    p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
     p *= 17.0;
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
@@ -45,26 +54,20 @@ float hash(vec3 p) {
 float noise(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
-    float n000 = hash(i + vec3(0,0,0));
-    float n001 = hash(i + vec3(0,0,1));
-    float n010 = hash(i + vec3(0,1,0));
-    float n011 = hash(i + vec3(0,1,1));
-    float n100 = hash(i + vec3(1,0,0));
-    float n101 = hash(i + vec3(1,0,1));
-    float n110 = hash(i + vec3(1,1,0));
-    float n111 = hash(i + vec3(1,1,1));
-    vec3 u = f*f*(3.0 - 2.0*f);
+    f = f * f * (3.0 - 2.0 * f);
+
     return mix(
-        mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-        mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
-        u.z
+        mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x),
+            mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+        mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x),
+            mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
+        f.z
     );
 }
 
 float fbm(vec3 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 5; i++) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 6; i++) {
         v += a * noise(p);
         p *= 2.0;
         a *= 0.5;
@@ -87,27 +90,55 @@ float cloudCoverageField(vec3 dir) {
 }
 
 // Terrain Height and SDF
+float continentMask(vec3 n) {
+    float plate = fbm(n * 0.35 + vec3(17.3));
+    float breakup = fbm(n * 0.8 + vec3(91.7));
+    float ocean = fbm(n * 1.6 + vec3(211.3));
+
+    float land = plate * 0.7 + breakup * 0.3;
+
+    land -= smoothstep(0.45, 0.75, ocean) * 0.6;
+    land += 0.15;
+
+    return smoothstep(0.35, 0.55, land);
+}
+
+float ridged(vec3 p) {
+    float sum = 0.0, amp = 0.6, f = 1.0;
+    for (int i = 0; i < 6; i++) {
+        float n = noise(p * f);
+        float r = 1.0 - abs(n * 2.0 - 1.0);
+        sum += r * r * amp;
+        f *= 2.0;
+        amp *= 0.55;
+    }
+    return clamp(sum, 0.0, 1.0);
+}
+
 float terrainHeight(vec3 p) {
-    vec3 scaledP = p / planetRadius;
+    vec3 n = normalize(p);
+    float cont = continentMask(n);
 
-    float warpFreq = 1.15;
-    float warpAmp = 0.06;
+    float hills = fbm(n * 4.5);
+    float ranges = smoothstep(0.55, 0.78, fbm(n * 5.0 + 17.0)) * cont;
 
-    vec3 warp = vec3(
-        fbm(scaledP * warpFreq + vec3(11.7)),
-        fbm(scaledP * warpFreq + vec3(3.9, 17.2, 5.1)),
-        fbm(scaledP * warpFreq - vec3(7.5))
-    );
+    float m = ridged(n * 10.5);
+    float mShape = smoothstep(0.45, 0.95, m);
+    float peaks = smoothstep(0.6, 1.0, fbm(n * 65.0));
 
-    vec3 warpedP = scaledP * 8.0 + (warp - 0.5) * 2.0 * warpAmp;
+    float basin = smoothstep(0.3, 0.7, fbm(n * 1.2 + vec3(77.0)));
 
-    float base = fbm(warpedP);
-    float detail = fbm(warpedP * 2.5) * 0.35;
+    float height =
+        cont * CONTINENT_GAIN +
+        cont * (hills - 0.5) * 2.0 * HILLS_GAIN -
+        cont * basin * 0.9 +
+        ranges * mShape * MOUNTAIN_GAIN +
+        ranges * pow(mShape, 5.0) * PEAK_GAIN * peaks -
+        (1.0 - cont) * OCEAN_DEPTH;
 
-    float normalized = base * 0.62 + detail * 0.38;
-    // Bias the terrain downward so a portion of the surface sits below sea level,
-    // revealing oceans instead of an all-land sphere.
-    return (normalized - 0.42) * heightScale;
+    float compressedHeight = height / (1.0 + abs(height) / 7.0);
+
+    return compressedHeight * VERTICAL_EXAGGERATION;
 }
 
 float planetSDF(vec3 p) {
@@ -157,12 +188,22 @@ bool marchPlanet(vec3 ro, vec3 rd, float lodFactor, float jitter, float tMin, fl
     return false;
 }
 
-vec3 computeNormal(vec3 p, float d0) {
-    float eps = max(planetRadius * 0.0005, heightScale * 0.03);
-    float dx = planetSDF(p + vec3(eps,0,0)) - d0;
-    float dy = planetSDF(p + vec3(0,eps,0)) - d0;
-    float dz = planetSDF(p + vec3(0,0,eps)) - d0;
-    return normalize(vec3(dx, dy, dz));
+float map(vec3 p) { return planetSDF(p); }
+
+vec3 calcNormal(vec3 p) {
+    float elev = length(p) - planetRadius;
+    float h = mix(0.018, 0.06, smoothstep(2.0, 18.0, elev));
+    vec2 k = vec2(1, -1);
+    return normalize(
+        k.xyy * map(p + k.xyy * h) +
+        k.yyx * map(p + k.yyx * h) +
+        k.yxy * map(p + k.yxy * h) +
+        k.xxx * map(p + k.xxx * h)
+    );
+}
+
+vec3 computeNormal(vec3 p) {
+    return calcNormal(p);
 }
 
 bool intersectSphere(vec3 ro, vec3 rd, float R, out float t0, out float t1) {
@@ -275,8 +316,7 @@ void main() {
     vec3 normalPlanet = normalize(rd);
 
     if (hit) {
-        float d0 = planetSDF(posPlanet);
-        normalPlanet = computeNormal(posPlanet, d0);
+        normalPlanet = computeNormal(posPlanet);
         baseColor = landColor(posPlanet, normalPlanet, heightValue);
         waterFlag = 0.0;
     }
